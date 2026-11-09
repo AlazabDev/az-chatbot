@@ -14,16 +14,277 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bot_agents: {
+        Row: {
+          agent_name: string | null
+          agent_version: string
+          created_at: string
+          deployment: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          max_tokens: number
+          name: string
+          provider: string
+          sort_order: number
+          system_prompt: string
+          temperature: number
+          updated_at: string
+        }
+        Insert: {
+          agent_name?: string | null
+          agent_version?: string
+          created_at?: string
+          deployment?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          max_tokens?: number
+          name: string
+          provider?: string
+          sort_order?: number
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_name?: string | null
+          agent_version?: string
+          created_at?: string
+          deployment?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          max_tokens?: number
+          name?: string
+          provider?: string
+          sort_order?: number
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          admin_notes: string | null
+          assigned_admin: string | null
+          created_at: string
+          human_takeover: boolean
+          id: string
+          last_message_at: string
+          message_count: number
+          metadata: Json
+          session_id: string
+          status: string
+          updated_at: string
+          visitor_email: string | null
+          visitor_name: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          assigned_admin?: string | null
+          created_at?: string
+          human_takeover?: boolean
+          id?: string
+          last_message_at?: string
+          message_count?: number
+          metadata?: Json
+          session_id: string
+          status?: string
+          updated_at?: string
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          assigned_admin?: string | null
+          created_at?: string
+          human_takeover?: boolean
+          id?: string
+          last_message_at?: string
+          message_count?: number
+          metadata?: Json
+          session_id?: string
+          status?: string
+          updated_at?: string
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Relationships: []
+      }
+      kb_collections: {
+        Row: {
+          created_at: string
+          description: string | null
+          document_count: number | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          document_count?: number | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          document_count?: number | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      kb_documents: {
+        Row: {
+          collection_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          name: string
+          status: string | null
+          type: string | null
+        }
+        Insert: {
+          collection_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          status?: string | null
+          type?: string | null
+        }
+        Update: {
+          collection_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          status?: string | null
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_documents_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "kb_collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          attachments: Json
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          attachments?: Json
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+        }
+        Update: {
+          attachments?: Json
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "admin"
+        | "architect"
+        | "consultant"
+        | "contractor"
+        | "client"
+        | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +411,15 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "admin",
+        "architect",
+        "consultant",
+        "contractor",
+        "client",
+        "viewer",
+      ],
+    },
   },
 } as const
