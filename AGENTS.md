@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+
+- Chat replies go through the `foundryChat` server function (Azure AI Foundry), not Supabase Edge Functions — edge functions are not used on this stack.
+- `src/lib/supabase/client.ts` only re-exports the generated Cloud client so the app has a single auth session.

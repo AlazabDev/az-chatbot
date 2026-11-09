@@ -1,0 +1,16 @@
+{
+  "source": "code-archive (azabot-main)",
+  "capabilities": [
+    {"capability": "code", "source": "TanStack Start app", "outcome": "migrate", "status": "done", "next_action": "none"},
+    {"capability": "schema", "source": "types.ts + migrations (only tables the app uses)", "outcome": "migrate", "status": "done", "next_action": "none"},
+    {"capability": "records", "source": "old backend (bot_agents, conversations, messages, kb_*)", "outcome": "migrate", "status": "pending", "next_action": "user exports CSV/JSON"},
+    {"capability": "auth identities", "source": "old auth users", "outcome": "migrate", "status": "pending", "next_action": "user export; users reset password via 'forgot password' on first visit"},
+    {"capability": "authorization", "source": "user_roles + has_role + admin email list", "outcome": "migrate", "status": "done", "next_action": "admin emails get admin role on signup"},
+    {"capability": "uploaded file bytes", "source": "chatbot-uploads, kb-documents", "outcome": "migrate", "status": "pending", "next_action": "buckets recreated; files need export"},
+    {"capability": "chatbot edge function", "source": "supabase/functions/chatbot", "outcome": "replaced by existing foundryChat server function", "status": "done", "next_action": "none"},
+    {"capability": "Azure AI Foundry / Azure OpenAI", "source": "FOUNDRY_*, AZURE_OPENAI_*", "outcome": "preserve", "status": "pending", "next_action": "secrets requested"},
+    {"capability": "public endpoint /api/public/agents/$slug + embed.js", "source": "src/routes/api/public", "outcome": "preserve", "status": "done", "next_action": "none"},
+    {"capability": "cutover", "source": "embed snippet on external sites", "outcome": "update embed domain after publish", "status": "pending", "next_action": "user"},
+    {"capability": "verification", "source": "-", "outcome": "verify", "status": "partial", "next_action": "typecheck clean, pages load; live chat needs Azure keys"}
+  ]
+}
