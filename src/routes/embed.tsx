@@ -43,10 +43,6 @@ function EmbedPage() {
     window.parent?.postMessage({ source: "azabot", type: "layout", state }, "*");
   };
 
-  const notifyState = (state: "collapsed" | "expanded" | "open") => {
-    window.parent?.postMessage({ source: "azabot", type: "layout", state }, "*");
-  };
-
   if (!mounted) return null;
 
   return (
