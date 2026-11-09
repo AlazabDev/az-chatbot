@@ -1,0 +1,16 @@
+{
+  "source": "code-archive (azabot-main)",
+  "capabilities": [
+    {"capability": "code", "source": "TanStack Start app (src/)", "outcome": "migrate", "status": "in_progress", "next_action": "copy source and align to target versions"},
+    {"capability": "schema", "source": "supabase/migrations (19 files)", "outcome": "migrate", "status": "pending", "next_action": "apply to Lovable Cloud"},
+    {"capability": "records", "source": "old Supabase project", "outcome": "migrate", "status": "pending", "next_action": "request CSV exports after preview"},
+    {"capability": "auth identities", "source": "Supabase auth", "outcome": "migrate", "status": "pending", "next_action": "request user export; first-login verification + new password"},
+    {"capability": "authorization", "source": "roles + RLS in migrations", "outcome": "migrate", "status": "pending", "next_action": "apply with schema"},
+    {"capability": "uploaded file bytes", "source": "storage buckets", "outcome": "migrate", "status": "pending", "next_action": "recreate buckets; files need export"},
+    {"capability": "chatbot edge function", "source": "supabase/functions/chatbot", "outcome": "port to server function", "status": "pending", "next_action": "port"},
+    {"capability": "Azure AI Foundry / Azure OpenAI", "source": "FOUNDRY_*, AZURE_OPENAI_*", "outcome": "preserve", "status": "pending", "next_action": "request secrets securely"},
+    {"capability": "public endpoint /api/public/agents/$slug + embed.js", "source": "src/routes/api/public", "outcome": "preserve", "status": "pending", "next_action": "copy"},
+    {"capability": "cutover", "source": "embed snippets on external sites", "outcome": "update embed URL after publish", "status": "pending", "next_action": "user updates embed domain"},
+    {"capability": "verification", "source": "-", "outcome": "verify", "status": "pending", "next_action": "build + route checks"}
+  ]
+}
