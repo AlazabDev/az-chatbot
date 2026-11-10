@@ -107,6 +107,18 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     Number.isFinite(inputRate) && Number.isFinite(outputRate)
     ? Number(((inputTokens * inputRate + outputTokens * outputRate) / 1_000_000).toFixed(6))
     : null;
+  const { error: metricError } = await supabaseAdmin.from("chat_gateway_usage").insert({
+    request_id: requestId,
+    agent_id: agent.id,
+    outcome: "success",
+    latency_ms: latencyMs,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    estimated_cost_usd: estimatedUsd,
+  });
+  if (metricError) console.warn(JSON.stringify({
+    event: "public_chat_usage_store_failed", requestId, code: metricError.code,
+  }));
   console.info(JSON.stringify({
     event: "public_chat_completed", requestId, agentId: agent.id, latencyMs,
     inputTokens, outputTokens, estimatedUsd,
