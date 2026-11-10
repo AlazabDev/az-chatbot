@@ -1,3 +1,4 @@
+import { hasInternalWorkerAuthorization } from "../_shared/internal-worker-auth.ts";
 /**
  * ai_auto_reply — Edge Function
  * ══════════════════════════════
@@ -176,6 +177,7 @@ async function sendWhatsApp(phoneNumberId: string, to: string, text: string): Pr
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  if (!hasInternalWorkerAuthorization(req)) return json({ error: "Unauthorized" }, 401);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
