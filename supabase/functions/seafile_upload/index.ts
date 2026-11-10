@@ -1,3 +1,4 @@
+import { hasInternalWorkerAuthorization } from "../_shared/internal-worker-auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { getMetaApiVersion, requireMetaAccessToken } from "../_shared/meta-env.ts";
 
@@ -24,6 +25,8 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  if (!hasInternalWorkerAuthorization(req)) return json({ error: "Unauthorized" }, 401);
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
