@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { getMetaApiVersion, requireMetaAccessToken } from "../_shared/meta-env.ts";
 
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -94,7 +96,13 @@ Deno.serve(async (req) => {
         return json({ error: "Failed to download media from Meta" }, 502);
       }
 
+      const waLength = Number(fileRes.headers.get("content-length") || 0);
+      if (waLength > MAX_FILE_BYTES) return json({ error: "Media too large" }, 413);
+      const sourceLength = Number(fileRes.headers.get("content-length") || 0);
+      if (sourceLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
       fileBytes = new Uint8Array(await fileRes.arrayBuffer());
+      if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
+      if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "Media too large" }, 413);
 
       // Generate file extension from mime
       const ext = getExtFromMime(mime_type || mediaInfo.mime_type || "");
