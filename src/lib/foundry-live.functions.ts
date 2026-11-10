@@ -40,11 +40,7 @@ function clientIdentity(visitorId: string): string {
 
 async function enforceGuestLimit(visitorId: string, agentId: string): Promise<void> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  // The migration introduces a new RPC that is not yet present in generated Database types.
-  const quotaClient = supabaseAdmin as unknown as {
-    rpc: (name: string, args: Record<string, string>) => Promise<{ data: boolean | null; error: { code?: string } | null }>;
-  };
-  const { data, error } = await quotaClient.rpc("consume_guest_chat_quota", {
+  const { data, error } = await supabaseAdmin.rpc("consume_guest_chat_quota", {
     p_visitor_id: visitorId,
     p_ip_hash: clientIdentity(visitorId),
     p_agent_id: agentId,
@@ -68,7 +64,7 @@ export const foundryAgentChat = createServerFn({ method: "POST" })
     const { data: agent, error } = await supabaseAdmin.from("bot_agents")
       .select("id,agent_name,provider,agent_version,is_active")
       .eq("id", data.agentId).eq("provider", "foundry")
-      .eq("is_active", true).eq("public_access" as never, true).maybeSingle();
+      .eq("is_active", true).eq("public_access", true).maybeSingle();
     if (error || !agent?.agent_name) throw new Error("Selected agent is not available");
 
     // Each signed conversation is tied to its selected agent UUID.
