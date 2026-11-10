@@ -11,6 +11,7 @@ export const listPublicAgents = createServerFn({ method: "GET" }).handler(async 
     .select("id,name,description,agent_name,is_default")
     .eq("is_active", true)
     .eq("provider", "foundry")
+    .eq("public_access", true)
     .order("sort_order", { ascending: true });
   if (error) throw new Error("تعذر تحميل الوكلاء المسجلين");
   return (data ?? []).map((a) => ({
