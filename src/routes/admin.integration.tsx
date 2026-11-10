@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Save, Wifi, CheckCircle2, XCircle, Loader2, AlertCircle } from "lucide-react";
@@ -10,6 +11,7 @@ import {
 import { testAzureConnection } from "@/lib/azure.functions";
 
 export const Route = createFileRoute("/admin/integration")({
+  head: () => pageHead("إعدادات Azure OpenAI", "إعدادات Azure OpenAI في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: IntegrationPage,
 });
 

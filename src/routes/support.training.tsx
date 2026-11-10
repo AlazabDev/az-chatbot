@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { GraduationCap } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/support/training")({
+  head: () => pageHead("دعم التدريب", "دعم التدريب في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: SupportTrainingPage,
 });
 

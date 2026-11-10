@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +12,8 @@ import {
   previewAgentTraining, publishAgentTraining,
 } from "@/lib/foundry-training.functions";
 
-export const Route = createFileRoute("/admin/training")({ component: AgentTrainingPage });
+export const Route = createFileRoute("/admin/training")({
+  head: () => pageHead("تدريب الوكلاء", "تدريب الوكلاء في منصة عزبوت للمحادثة وإدارة الوكلاء."), component: AgentTrainingPage });
 
 function AgentTrainingPage() {
   const qc = useQueryClient();

@@ -17,6 +17,7 @@ type CallState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
 interface VoiceCallProps {
   open: boolean;
+  selectedAgentId?: string;
   conversationId: string;
   onConversationId: (id: string) => void;
   onTranscript: (msg: ChatMessage) => void;
@@ -25,6 +26,7 @@ interface VoiceCallProps {
 
 export function VoiceCall({
   open,
+  selectedAgentId,
   conversationId,
   onConversationId,
   onTranscript,
@@ -67,6 +69,8 @@ export function VoiceCall({
     // speech-recognition turn loop when realtime isn't available.
     (async () => {
       try {
+        // A generic realtime deployment cannot preserve a selected agent's identity.
+        if (selectedAgentId) throw new Error("Use selected agent voice conversation");
         const handle = await startLiveCall({
           onConnected: () => {
             if (!activeRef.current) return;
@@ -200,6 +204,7 @@ export function VoiceCall({
     setCaption(text);
     try {
       const res = await sendChatMessage({
+        agentId: selectedAgentId,
         message: text,
         conversationId: convRef.current,
         files: [],

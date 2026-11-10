@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { Bot, Plus, Save, Trash2, Loader2, Star, AlertTriangle, CheckCircle2 } f
 import { listAgents, saveAgent, deleteAgent, type BotAgent } from "@/lib/agents.functions";
 
 export const Route = createFileRoute("/admin/agents")({
+  head: () => pageHead("وكلاء البوت", "وكلاء البوت في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AgentsPage,
 });
 

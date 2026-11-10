@@ -28,7 +28,9 @@ export function loadAzureConfig(): AzureOpenAIConfig {
   try {
     const raw = window.localStorage.getItem(LS_KEY);
     if (!raw) return DEFAULT_AZURE_CONFIG;
-    return { ...DEFAULT_AZURE_CONFIG, ...JSON.parse(raw) };
+    const saved = { ...DEFAULT_AZURE_CONFIG, ...JSON.parse(raw), apiKey: "" };
+    window.localStorage.setItem(LS_KEY, JSON.stringify(saved));
+    return saved;
   } catch {
     return DEFAULT_AZURE_CONFIG;
   }
@@ -36,7 +38,7 @@ export function loadAzureConfig(): AzureOpenAIConfig {
 
 export function saveAzureConfig(cfg: AzureOpenAIConfig) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+  window.localStorage.setItem(LS_KEY, JSON.stringify({ ...cfg, apiKey: "" }));
 }
 
 export interface TrainingExample {

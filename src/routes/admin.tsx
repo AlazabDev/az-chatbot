@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -15,6 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin")({
+  head: () => pageHead("إدارة عزبوت", "إدارة عزبوت في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   ssr: false,
   beforeLoad: async () => {
     const { data: userData, error: userErr } = await supabase.auth.getUser();

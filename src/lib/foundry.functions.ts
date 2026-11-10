@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { createHmac, timingSafeEqual } from "crypto";
+import { signConversation, verifyConversation } from "@/lib/threadTokens.server";
 
 /** Azure AI Foundry v1 (conversations + responses) surface. */
 const V1_PATH = "/openai/v1";
@@ -67,37 +67,6 @@ function safeAttachmentUrl(value: string): string | null {
   }
 }
 
-function getSigningSecret(): string {
-  const secret =
-    process.env.THREAD_SIGNING_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.FOUNDRY_API_KEY;
-  if (!secret) throw new Error("Missing signing secret");
-  return secret;
-}
-
-function signThreadId(threadId: string): string {
-  const sig = createHmac("sha256", getSigningSecret()).update(threadId).digest("hex");
-  return `${threadId}.${sig}`;
-}
-
-function verifyThreadToken(token: string): string | null {
-  const idx = token.lastIndexOf(".");
-  if (idx < 0) return null;
-  const id = token.slice(0, idx);
-  const sig = token.slice(idx + 1);
-  if (!id || !sig) return null;
-  const expected = createHmac("sha256", getSigningSecret()).update(id).digest("hex");
-  try {
-    const a = Buffer.from(sig, "hex");
-    const b = Buffer.from(expected, "hex");
-    if (a.length !== b.length) return null;
-    return timingSafeEqual(a, b) ? id : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Raised when the agent definition requires an end-user Entra token. */
 const E_USER_SCOPE = "E_USER_SCOPE";
 
@@ -106,6 +75,7 @@ async function foundryFetch<T>(path: string, init: RequestInit = {}): Promise<T>
   const res = await fetch(url, {
     ...init,
     headers: { ...authHeaders(), ...(init.headers || {}) },
+    signal: init.signal ?? AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -310,7 +280,7 @@ export const foundryChat = createServerFn({ method: "POST" })
       attachments,
     } satisfies FoundryChatInput;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
       const { resolveAgent } = await import("@/lib/agents.server");
       const agent = await resolveAgent(data.agentId);
@@ -324,11 +294,15 @@ export const foundryChat = createServerFn({ method: "POST" })
         process.env.FOUNDRY_AGENT_VER ||
         process.env.FOUNDRY_AGENT_VERSION ||
         "1";
+      const threadScope = agent?.id || `${agentName}:${agentVersion}`;
 
       // 1) Build the user message content parts.
       const contentParts: Array<Record<string, unknown>> = [];
       const fileList: string[] = [];
       for (const att of data.attachments ?? []) {
+        if (!decodeURIComponent(new URL(att.url).pathname).startsWith(`/storage/v1/object/sign/chatbot-uploads/${context.userId}/`)) {
+          throw new Error("Invalid attachment owner");
+        }
         if (att.type.startsWith("image/")) {
           contentParts.push({ type: "input_image", image_url: att.url });
         } else {
@@ -346,7 +320,7 @@ export const foundryChat = createServerFn({ method: "POST" })
       };
 
       // 2) Ensure a conversation — verify the caller's signed token or mint a new one.
-      let conversationId: string | null = data.threadId ? verifyThreadToken(data.threadId) : null;
+      let conversationId: string | null = verifyConversation(data.threadId, threadScope, context.userId);
       if (!conversationId) {
         const conv = await foundryFetch<{ id: string }>("/conversations", {
           method: "POST",
@@ -416,7 +390,7 @@ export const foundryChat = createServerFn({ method: "POST" })
       const reply = directMaintenanceReply || extractText(toolRun.response);
       if (!reply) throw new Error("Empty response from Foundry");
       return {
-        threadId: signThreadId(conversationId),
+        threadId: signConversation(conversationId, threadScope, context.userId),
         reply,
         agent: agent ? { id: agent.id, name: agent.name } : null,
         latencyMs: Date.now() - startedAt,

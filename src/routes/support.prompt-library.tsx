@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { LibraryBig } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/support/prompt-library")({
+  head: () => pageHead("مكتبة التوجيهات", "مكتبة التوجيهات في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: SupportPromptLibraryPage,
 });
 

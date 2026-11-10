@@ -13,6 +13,7 @@ interface ChatButtonProps {
 
   selectedAgentId?: string;
   onSelectAgent?: (agent: AgentItem) => void;
+  onPickerChange?: (open: boolean) => void;
 
   onExpand: () => void;
   onCollapse: () => void;
@@ -25,6 +26,7 @@ export function ChatButton({
   isExpanded,
   selectedAgentId,
   onSelectAgent,
+  onPickerChange,
   onExpand,
   onCollapse,
   onOpenChat,
@@ -90,7 +92,7 @@ export function ChatButton({
               <MessageCircle className="h-4 w-4" />
             </Button>
 
-            <AgentPickerPopover selectedAgentId={selectedAgentId} onSelectAgent={onSelectAgent} />
+            <AgentPickerPopover selectedAgentId={selectedAgentId} onSelectAgent={onSelectAgent} onOpenChange={onPickerChange} />
 
             <Button
               type="button"

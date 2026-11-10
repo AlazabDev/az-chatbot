@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -22,6 +23,7 @@ import { callAzureOpenAI } from "@/lib/azure.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/knowledge")({
+  head: () => pageHead("قاعدة المعرفة", "قاعدة المعرفة في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: KnowledgePage,
 });
 

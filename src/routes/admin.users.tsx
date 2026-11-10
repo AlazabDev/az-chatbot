@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/admin/users")({
+  head: () => pageHead("إدارة المستخدمين", "إدارة المستخدمين في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminUsersPage,
 });
 

@@ -21,8 +21,10 @@ import { ChatMessages } from "./ChatMessages";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatSettings } from "./ChatSettings";
 import { VoiceCall } from "./VoiceCall";
+import { Link } from "@tanstack/react-router";
 
 interface ChatWindowProps {
+  sessionUnavailable?: boolean;
   open: boolean;
   messages: ChatMessage[];
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
@@ -47,6 +49,7 @@ interface PendingPayload {
 }
 
 export function ChatWindow({
+  sessionUnavailable = false,
   open,
   messages,
   setMessages,
@@ -311,15 +314,22 @@ export function ChatWindow({
           onSuggestion={(t) => inputRef.current?.setText(t)}
           suggestions={suggestions}
         />
+        {sessionUnavailable && (
+          <div role="status" className="border-t border-border bg-muted px-4 py-3 text-sm text-foreground">
+            يلزم تسجيل الدخول للمحادثة.
+            <Link to="/auth" search={{ reason: "signin" }} target="_blank" className="ms-2 font-semibold text-primary underline">تسجيل الدخول</Link>
+          </div>
+        )}
         <ChatInput
           ref={inputRef}
-          disabled={busy}
+          disabled={busy || sessionUnavailable}
           isListening={isListening}
           voiceSupported={voiceSupported}
           onSend={handleSend}
           onToggleVoice={handleToggleVoice}
         />
         <VoiceCall
+          selectedAgentId={selectedAgentId}
           open={callOpen}
           conversationId={conversationId}
           onConversationId={setConversationId}
