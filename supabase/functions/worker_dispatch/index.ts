@@ -1,4 +1,3 @@
-import { hasInternalWorkerAuthorization } from "../_shared/internal-worker-auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { getMetaApiVersion, requireMetaAccessToken } from "../_shared/meta-env.ts";
 
@@ -16,12 +15,15 @@ function json(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req) => {
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const bearer = req.headers.get("Authorization");
+  if (!serviceRole || bearer !== `Bearer ${serviceRole}`) {
+    return new Response("Unauthorized", { status: 401 });
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  if (!hasInternalWorkerAuthorization(req)) return json({ error: "Unauthorized" }, 401);
-
-  // Only server-to-server requests bearing the service-role credential may dispatch jobs.
+  // Auth verified using the service role bearer before accessing the job queue.
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
