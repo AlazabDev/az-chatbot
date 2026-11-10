@@ -68,7 +68,7 @@ export const foundryAgentChat = createServerFn({ method: "POST" })
     const { data: agent, error } = await supabaseAdmin.from("bot_agents")
       .select("id,agent_name,provider,agent_version,is_active")
       .eq("id", data.agentId).eq("provider", "foundry")
-      .eq("is_active", true).eq("public_access", true).maybeSingle();
+      .eq("is_active", true).eq("public_access" as never, true).maybeSingle();
     if (error || !agent?.agent_name) throw new Error("Selected agent is not available");
 
     // Each signed conversation is tied to its selected agent UUID.
