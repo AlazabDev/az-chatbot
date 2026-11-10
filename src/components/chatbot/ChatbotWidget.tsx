@@ -31,6 +31,7 @@ export function ChatbotWidget({
   };
   const {
     hydrated,
+    sessionState,
     messages,
     setMessages,
     settings,
@@ -47,6 +48,7 @@ export function ChatbotWidget({
     <>
       <ChatWindow
         key={selectedAgentId}
+        sessionUnavailable={sessionState !== "ready"}
         open={open}
         messages={messages}
         setMessages={setMessages}

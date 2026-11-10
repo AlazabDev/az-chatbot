@@ -35,3 +35,5 @@ use the editor.
 - `src/lib/supabase/client.ts` only re-exports the generated Cloud client so the app has a single auth session.
 - Signed Foundry conversation tokens bind both the authenticated visitor and selected agent to prevent cross-account or cross-agent reuse.
 - Embedded agent menus report their layout to the host iframe, which verifies both message origin and source before resizing.
+- Legacy Azure settings never persist private API keys in browser storage; production credentials belong in server secrets.
+- Content routes use per-page metadata, sharing the pageHead helper when no custom metadata exists.
