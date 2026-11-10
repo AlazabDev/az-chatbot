@@ -1,24 +1,17 @@
 import { useEffect, useState } from "react";
 import type { ChatMessage, ChatSettingsState } from "@/types/chat";
 import { listPublicAgents } from "@/lib/agents/dispatcher.functions";
+import { getChatStorage, setChatStorage, getChatVisitorId } from "@/lib/chatStorage";
 
 const PREFIX = "azab.chat";
 const LS_SETTINGS = `${PREFIX}.settings`;
 const LS_AGENT_ID = `${PREFIX}.agentId`;
-const LS_VISITOR_ID = `${PREFIX}.visitorId`;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const DEFAULT_AGENT_ID = "az-agent-azabot";
 const DEFAULT_SETTINGS: ChatSettingsState = { voiceReplies: false, exportFormat: "txt", theme: "light" };
 
-function read(key: string): string | null {
-  try { return typeof window === "undefined" ? null : window.localStorage.getItem(key); }
-  catch { return null; }
-}
-function write(key: string, value: string): void {
-  try { if (typeof window !== "undefined") window.localStorage.setItem(key, value); }
-  catch { /* Memory-only fallback when storage is unavailable. */ }
-}
+const read = getChatStorage;
+const write = setChatStorage;
 function parse<T>(key: string, fallback: T): T {
   const raw = read(key);
   if (!raw) return fallback;
@@ -58,10 +51,7 @@ export function useChatSession({ applyTheme = true }: Options = {}) {
     let active = true;
     const storedSettings = parse<Partial<ChatSettingsState>>(LS_SETTINGS, {});
     setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
-    const visitor = read(LS_VISITOR_ID);
-    const id = visitor && UUID_RE.test(visitor) ? visitor : crypto.randomUUID();
-    setVisitorId(id);
-    write(LS_VISITOR_ID, id);
+    setVisitorId(getChatVisitorId());
     const storedAgent = read(LS_AGENT_ID) || DEFAULT_AGENT_ID;
     setSelectedAgentId(storedAgent);
     setHydrated(true);
