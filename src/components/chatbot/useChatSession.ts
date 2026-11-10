@@ -2,115 +2,111 @@ import { useEffect, useState } from "react";
 import type { ChatMessage, ChatSettingsState } from "@/types/chat";
 import { listPublicAgents } from "@/lib/agents/dispatcher.functions";
 
-const LS_MESSAGES = "azab.chat.messages";
-const LS_SETTINGS = "azab.chat.settings";
-const LS_CONV_ID = "azab.chat.conversationId";
-const LS_AGENT_ID = "azab.chat.agentId";
-const LS_VISITOR_ID = "azab.chat.visitorId";
+const PREFIX = "azab.chat";
+const LS_SETTINGS = `${PREFIX}.settings`;
+const LS_AGENT_ID = `${PREFIX}.agentId`;
+const LS_VISITOR_ID = `${PREFIX}.visitorId`;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const DEFAULT_AGENT_ID = "az-agent-azabot";
+const DEFAULT_SETTINGS: ChatSettingsState = { voiceReplies: false, exportFormat: "txt", theme: "light" };
 
-const DEFAULT_SETTINGS: ChatSettingsState = {
-  voiceReplies: false,
-  exportFormat: "txt",
-  theme: "light",
-};
-
-function loadJSON<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+function read(key: string): string | null {
+  try { return typeof window === "undefined" ? null : window.localStorage.getItem(key); }
+  catch { return null; }
+}
+function write(key: string, value: string): void {
+  try { if (typeof window !== "undefined") window.localStorage.setItem(key, value); }
+  catch { /* Memory-only fallback when storage is unavailable. */ }
+}
+function parse<T>(key: string, fallback: T): T {
+  const raw = read(key);
+  if (!raw) return fallback;
+  try { return JSON.parse(raw) as T; } catch { return fallback; }
+}
+function sessionKey(agentId: string, field: "messages" | "conversationId"): string {
+  return `${PREFIX}.agent.${encodeURIComponent(agentId)}.${field}`;
+}
+function loadMessages(agentId: string): ChatMessage[] {
+  const stored = parse<unknown>(sessionKey(agentId, "messages"), []);
+  if (!Array.isArray(stored)) return [];
+  return stored.filter((m): m is ChatMessage =>
+    m != null && typeof m === "object" && typeof m.id === "string" &&
+    (m.role === "user" || m.role === "assistant") &&
+    typeof m.content === "string" && typeof m.timestamp === "number"
+  ).slice(-200);
 }
 
-/** `ready` means public chat is usable; it does not imply Supabase authentication. */
 export type ChatSessionState = "pending" | "ready" | "unavailable";
-
 interface Options {
-  /** Toggle the `dark` class on <html> from the saved chat theme. Default: true. */
   applyTheme?: boolean;
-  /** Compatibility option; public chat never requires anonymous authentication. */
+  /** Kept for callers using the old API; public text chat does not need Supabase authentication. */
   ensureSession?: boolean;
 }
 
-/**
- * Persistent chat state shared by the floating widget and the /help portal.
- * Both use the same localStorage keys, so a conversation continues across them.
- */
 export function useChatSession({ applyTheme = true }: Options = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [settings, setSettings] = useState<ChatSettingsState>(DEFAULT_SETTINGS);
-  const [conversationId, setConversationId] = useState<string>("");
+  const [conversationId, setConversationId] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState(DEFAULT_AGENT_ID);
+  const [loadedAgentId, setLoadedAgentId] = useState<string | null>(null);
+  const [visitorId, setVisitorId] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [sessionState] = useState<ChatSessionState>("ready");
-  const [visitorId, setVisitorId] = useState("");
 
   useEffect(() => {
-    let alive = true;
-    setMessages(loadJSON<ChatMessage[]>(LS_MESSAGES, []));
-    setSettings(loadJSON<ChatSettingsState>(LS_SETTINGS, DEFAULT_SETTINGS));
-    let id = window.localStorage.getItem(LS_CONV_ID);
-    if (!id) {
-      id = crypto.randomUUID();
-      window.localStorage.setItem(LS_CONV_ID, id);
-    }
-    setConversationId(id);
-    let visitor = window.localStorage.getItem(LS_VISITOR_ID);
-    if (!visitor || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(visitor)) {
-      visitor = crypto.randomUUID();
-      window.localStorage.setItem(LS_VISITOR_ID, visitor);
-    }
-    setVisitorId(visitor);
-    setHydrated(true);
-    const storedAgent = window.localStorage.getItem(LS_AGENT_ID) || DEFAULT_AGENT_ID;
+    let active = true;
+    const storedSettings = parse<Partial<ChatSettingsState>>(LS_SETTINGS, {});
+    setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
+    const visitor = read(LS_VISITOR_ID);
+    const id = visitor && UUID_RE.test(visitor) ? visitor : crypto.randomUUID();
+    setVisitorId(id);
+    write(LS_VISITOR_ID, id);
+    const storedAgent = read(LS_AGENT_ID) || DEFAULT_AGENT_ID;
     setSelectedAgentId(storedAgent);
+    setHydrated(true);
     void listPublicAgents().then((agents) => {
-      if (!alive) return;
-      if (agents.length && !agents.some((agent) => agent.id === storedAgent)) {
-        setSelectedAgentId((current) => current === storedAgent
-          ? (agents.find((agent) => agent.isDefault) ?? agents[0]).id
-          : current);
+      if (!active) return;
+      if (agents.length && !agents.some((agent) => agent.id === storedAgent || agent.slug === storedAgent)) {
+        setSelectedAgentId((current) => current === storedAgent ?
+          (agents.find((agent) => agent.isDefault) ?? agents[0]).id : current);
       }
-    }).catch(() => { /* Preserve the previous selection if discovery fails. */ });
-    return () => { alive = false; };
+    }).catch(() => { /* Discovery failure must not block the chat UI. */ });
+    return () => { active = false; };
   }, []);
 
+  // Load each agent's own conversation before permitting persistence for that agent.
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(LS_MESSAGES, JSON.stringify(messages));
-  }, [messages, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
-  }, [settings, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    if (conversationId) {
-      window.localStorage.setItem(LS_CONV_ID, conversationId);
-    } else {
-      window.localStorage.removeItem(LS_CONV_ID);
-    }
-  }, [conversationId, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(LS_AGENT_ID, selectedAgentId);
+    setLoadedAgentId(null);
+    setMessages(loadMessages(selectedAgentId));
+    setConversationId(read(sessionKey(selectedAgentId, "conversationId")) || "");
+    setLoadedAgentId(selectedAgentId);
+    write(LS_AGENT_ID, selectedAgentId);
   }, [selectedAgentId, hydrated]);
 
   useEffect(() => {
-    if (!hydrated || !applyTheme) return;
-    document.documentElement.classList.toggle("dark", settings.theme === "dark");
-  }, [settings.theme, hydrated, applyTheme]);
+    if (!hydrated || loadedAgentId !== selectedAgentId) return;
+    write(sessionKey(selectedAgentId, "messages"), JSON.stringify(messages.slice(-200)));
+  }, [messages, selectedAgentId, loadedAgentId, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || loadedAgentId !== selectedAgentId) return;
+    write(sessionKey(selectedAgentId, "conversationId"), conversationId);
+  }, [conversationId, selectedAgentId, loadedAgentId, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) write(LS_SETTINGS, JSON.stringify(settings));
+  }, [settings, hydrated]);
+
+  useEffect(() => {
+    if (hydrated && applyTheme) {
+      document.documentElement.classList.toggle("dark", settings.theme === "dark");
+    }
+  }, [settings.theme, applyTheme, hydrated]);
 
   return {
-    hydrated,
+    hydrated: hydrated && loadedAgentId === selectedAgentId,
     sessionState,
     visitorId,
     messages,
