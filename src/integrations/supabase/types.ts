@@ -229,6 +229,7 @@ export type Database = {
           max_tokens: number
           name: string
           provider: string
+          public_access: boolean
           sort_order: number
           system_prompt: string
           temperature: number
@@ -246,6 +247,7 @@ export type Database = {
           max_tokens?: number
           name: string
           provider?: string
+          public_access?: boolean
           sort_order?: number
           system_prompt?: string
           temperature?: number
@@ -263,6 +265,7 @@ export type Database = {
           max_tokens?: number
           name?: string
           provider?: string
+          public_access?: boolean
           sort_order?: number
           system_prompt?: string
           temperature?: number
@@ -480,6 +483,24 @@ export type Database = {
           name?: string
           system_prompt?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      chat_gateway_quota: {
+        Row: {
+          bucket_key: string
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          bucket_key: string
+          request_count?: number
+          window_start: string
+        }
+        Update: {
+          bucket_key?: string
+          request_count?: number
+          window_start?: string
         }
         Relationships: []
       }
@@ -2051,6 +2072,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      consume_guest_chat_quota: {
+        Args: { p_agent_id: string; p_ip_hash: string; p_visitor_id: string }
+        Returns: boolean
       }
       get_daily_message_counts: {
         Args: { days?: number }
