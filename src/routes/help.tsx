@@ -27,8 +27,7 @@ export const Route = createFileRoute("/help")({
   component: HelpPage,
 });
 
-/** The portal is maintenance support, so it always talks to the maintenance agent. */
-const PORTAL_AGENT_ID = "az-agent-maint";
+/** The help portal uses the same explicitly public agent policy as the widget. */
 
 const QUICK_ACTIONS = [
   {
@@ -236,7 +235,7 @@ function HelpPage() {
               settings={session.settings}
               setSettings={session.setSettings}
               callRequest={0}
-              selectedAgentId={PORTAL_AGENT_ID}
+              selectedAgentId={session.selectedAgentId}
               prefill={prefill}
               suggestions={SUGGESTIONS}
             />
