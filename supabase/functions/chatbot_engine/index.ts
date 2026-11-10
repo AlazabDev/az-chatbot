@@ -1,3 +1,4 @@
+import { hasInternalWorkerAuthorization } from "../_shared/internal-worker-auth.ts";
 /**
  * chatbot_engine — Edge Function
  * ══════════════════════════════
@@ -60,6 +61,7 @@ function makeSupabase() {
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  if (!hasInternalWorkerAuthorization(req)) return new Response("Unauthorized", { status: 401 });
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
