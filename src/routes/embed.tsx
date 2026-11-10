@@ -39,7 +39,7 @@ function EmbedPage() {
     window.parent?.postMessage({ source: "azabot", type: open ? "open" : "close" }, "*");
   };
 
-  const notifyState = (state: "collapsed" | "expanded" | "open") => {
+  const notifyState = (state: "collapsed" | "expanded" | "agents" | "open") => {
     window.parent?.postMessage({ source: "azabot", type: "layout", state }, "*");
   };
 

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getChatUploadSignedUrl } from "@/lib/chatUploads.functions";
 import { dispatchMessageToAgent } from "@/lib/agents/dispatcher.functions";
 import { foundryAgentChat } from "@/lib/foundry-live.functions";
+import { foundryChat } from "@/lib/foundry.functions";
 
 const BUCKET = "chatbot-uploads";
 
@@ -44,7 +45,7 @@ async function uploadFile(file: File, scope: string, userId: string): Promise<Up
 }
 
 /**
- * Sends a chat message + files through the Supabase Edge Function.
+ * Sends chat and files through authenticated Foundry server functions.
  * The Foundry credentials and thread-signing secret remain server-side.
  */
 export async function sendChatMessage({
@@ -106,8 +107,8 @@ export async function sendChatMessage({
     };
   }
 
-  const { data, error } = await supabase.functions.invoke("chatbot", {
-    body: {
+  const data = await foundryChat({
+    data: {
       threadId,
       message,
       attachments: attachments.map((attachment) => ({
@@ -117,11 +118,6 @@ export async function sendChatMessage({
       })),
     },
   });
-
-  if (error) {
-    console.error("[chatApi] chatbot edge function error:", error);
-    throw new Error("تعذر معالجة الطلب حالياً، يرجى المحاولة لاحقاً.");
-  }
 
   if (!data || typeof data.reply !== "string") {
     throw new Error("تعذر معالجة الطلب حالياً، يرجى المحاولة لاحقاً.");

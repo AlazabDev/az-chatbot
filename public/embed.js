@@ -1,7 +1,7 @@
 /*!
  * عزبوت — كود تضمين الشات بوت في أي موقع.
  * الاستخدام:
- *   <script src="https://azabot.lovable.app/embed.js" defer></script>
+ *   <script src="https://chatbot.alazab.com/embed.js" defer></script>
  * خيارات إضافية على وسم السكربت:
  *   data-position="right|left"   موضع الزر العائم (الافتراضي: right)
  *   data-z-index="999999"        ترتيب الطبقة
@@ -32,7 +32,8 @@
   var iframe = document.createElement("iframe");
   iframe.src = origin + "/embed";
   iframe.title = "عزبوت — المساعد الذكي";
-  iframe.setAttribute("allow", "microphone; camera; clipboard-write; autoplay");
+  iframe.setAttribute("allow", "microphone; clipboard-write; autoplay");
+  iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
   iframe.setAttribute("allowtransparency", "true");
   iframe.style.cssText = [
     "position:fixed",
@@ -60,6 +61,11 @@
       iframe.style.height = CLOSED.height;
       return;
     }
+    if (state === "agents") {
+      iframe.style.width = isMobile() ? "100vw" : EXPANDED.width;
+      iframe.style.height = "min(540px, 100dvh)";
+      return;
+    }
     if (state === "expanded") {
       iframe.style.width = isMobile() ? "100vw" : EXPANDED.width;
       iframe.style.height = EXPANDED.height;
@@ -76,12 +82,12 @@
 
   var widgetState = "collapsed";
   window.addEventListener("message", function (event) {
-    if (event.origin !== origin) return;
+    if (event.origin !== origin || event.source !== iframe.contentWindow) return;
     var data = event.data;
     if (!data || data.source !== "azabot") return;
     if (
       data.type === "layout" &&
-      (data.state === "collapsed" || data.state === "expanded" || data.state === "open")
+      (data.state === "collapsed" || data.state === "expanded" || data.state === "agents" || data.state === "open")
     ) {
       widgetState = data.state;
     } else if (data.type === "open") widgetState = "open";

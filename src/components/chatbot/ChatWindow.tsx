@@ -320,6 +320,7 @@ export function ChatWindow({
           onToggleVoice={handleToggleVoice}
         />
         <VoiceCall
+          selectedAgentId={selectedAgentId}
           open={callOpen}
           conversationId={conversationId}
           onConversationId={setConversationId}
