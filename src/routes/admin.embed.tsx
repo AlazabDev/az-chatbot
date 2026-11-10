@@ -22,7 +22,7 @@ export const Route = createFileRoute("/admin/embed")({
   component: AdminEmbed,
 });
 
-const FALLBACK_ORIGIN = "https://azabot.lovable.app";
+const FALLBACK_ORIGIN = "https://chatbot.alazab.com";
 
 function AdminEmbed() {
   const [origin, setOrigin] = useState(FALLBACK_ORIGIN);
@@ -30,7 +30,7 @@ function AdminEmbed() {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.origin.startsWith("http")) {
+    if (typeof window !== "undefined" && window.location.hostname === "chatbot.alazab.com") {
       setOrigin(window.location.origin);
     }
   }, []);
@@ -43,8 +43,8 @@ function AdminEmbed() {
   const iframeSnippet = useMemo(
     () =>
       `<iframe src="${origin}/embed" title="عزبوت — المساعد الذكي"
-  allow="microphone; camera; clipboard-write; autoplay"
-  style="position:fixed;bottom:0;${position === "left" ? "left" : "right"}:0;width:280px;height:170px;border:0;background:transparent;z-index:2147483000"></iframe>`,
+  allow="microphone; clipboard-write; autoplay" referrerpolicy="strict-origin-when-cross-origin"
+  style="position:fixed;bottom:0;${position === "left" ? "left" : "right"}:0;width:min(420px,100vw);height:min(680px,100dvh);border:0;background:transparent;z-index:2147483000"></iframe>`,
     [origin, position],
   );
 
