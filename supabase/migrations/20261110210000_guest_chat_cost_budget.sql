@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.chat_gateway_budget (
   day date PRIMARY KEY,
   reserved_usd numeric(14,6) NOT NULL DEFAULT 0 CHECK (reserved_usd >= 0),
+  daily_limit_usd numeric(14,6) NOT NULL DEFAULT 5 CHECK (daily_limit_usd > 0),
   observed_usd numeric(14,6) NOT NULL DEFAULT 0 CHECK (observed_usd >= 0),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -40,11 +41,12 @@ BEGIN
  IF p_request_id IS NULL OR p_reserve_usd IS NULL OR p_daily_limit_usd IS NULL
     OR p_reserve_usd <= 0 OR p_daily_limit_usd <= 0
     OR p_reserve_usd > 25 OR p_daily_limit_usd > 500 THEN RETURN false; END IF;
- INSERT INTO public.chat_gateway_budget AS b (day,reserved_usd,updated_at)
- SELECT d,p_reserve_usd,now() WHERE p_reserve_usd <= p_daily_limit_usd
+ INSERT INTO public.chat_gateway_budget AS b (day,reserved_usd,daily_limit_usd,updated_at)
+ SELECT d,p_reserve_usd,p_daily_limit_usd,now() WHERE p_reserve_usd <= p_daily_limit_usd
  ON CONFLICT (day) DO UPDATE
- SET reserved_usd=b.reserved_usd+EXCLUDED.reserved_usd,updated_at=now()
- WHERE b.reserved_usd + EXCLUDED.reserved_usd <= p_daily_limit_usd
+ SET reserved_usd=b.reserved_usd+EXCLUDED.reserved_usd,
+     daily_limit_usd=least(b.daily_limit_usd,EXCLUDED.daily_limit_usd),updated_at=now()
+ WHERE b.reserved_usd + EXCLUDED.reserved_usd <= least(b.daily_limit_usd,EXCLUDED.daily_limit_usd)
  RETURNING true,reserved_usd INTO accepted,total_reserved;
  IF accepted IS DISTINCT FROM true THEN
    INSERT INTO public.chat_gateway_alerts(day,code,severity) VALUES(d,'daily_budget_exhausted','critical')
@@ -80,3 +82,20 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.finalize_guest_chat_budget(uuid,numeric) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.finalize_guest_chat_budget(uuid,numeric) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.get_chat_gateway_budget_status()
+RETURNS jsonb LANGUAGE sql SECURITY INVOKER SET search_path = '' AS $$
+ SELECT jsonb_build_object(
+   'day', b.day,
+   'reservedUsd', b.reserved_usd,
+   'dailyLimitUsd', b.daily_limit_usd,
+   'observedUsd', b.observed_usd,
+   'alerts', coalesce((
+     SELECT jsonb_agg(jsonb_build_object('code',a.code,'severity',a.severity))
+     FROM public.chat_gateway_alerts a WHERE a.day=b.day
+   ), '[]'::jsonb)
+ ) FROM public.chat_gateway_budget b
+ WHERE b.day=(now() at time zone 'UTC')::date
+$$;
+REVOKE ALL ON FUNCTION public.get_chat_gateway_budget_status() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_chat_gateway_budget_status() TO service_role;
