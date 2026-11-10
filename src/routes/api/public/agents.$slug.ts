@@ -42,13 +42,17 @@ export const Route = createFileRoute("/api/public/agents/$slug")({
         const parsed = bodySchema.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return response({ error: "INVALID_REQUEST" }, 400, requestId);
 
+        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(params.slug)) {
+          return response({ error: "INVALID_AGENT" }, 400, requestId);
+        }
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data: agent, error } = await supabaseAdmin.from("bot_agents")
             .select("id,agent_name,is_default")
             .eq("provider", "foundry").eq("is_active", true)
-            .eq("public_access", true).eq("agent_name", params.slug)
-            .maybeSingle();
+            .eq("public_access", true)
+            .in("agent_name", [params.slug, params.slug.startsWith("az-agent-") ? params.slug : `az-agent-${params.slug}`])
+            .limit(1).maybeSingle();
           if (error || !agent) return response({ error: "AGENT_UNAVAILABLE" }, 404, requestId);
 
           const { executePublicChat } = await import("@/lib/public-chat.server");
