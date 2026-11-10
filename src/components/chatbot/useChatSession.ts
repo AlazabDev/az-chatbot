@@ -33,7 +33,7 @@ export type ChatSessionState = "pending" | "ready" | "unavailable";
 interface Options {
   /** Toggle the `dark` class on <html> from the saved chat theme. Default: true. */
   applyTheme?: boolean;
-  /** Open an anonymous Supabase session when the visitor has none (customer portal). */
+  /** Compatibility option; public chat never requires anonymous authentication. */
   ensureSession?: boolean;
 }
 
@@ -47,7 +47,7 @@ export function useChatSession({ applyTheme = true }: Options = {}) {
   const [conversationId, setConversationId] = useState<string>("");
   const [selectedAgentId, setSelectedAgentId] = useState(DEFAULT_AGENT_ID);
   const [hydrated, setHydrated] = useState(false);
-  const sessionState: ChatSessionState = "ready";
+  const [sessionState] = useState<ChatSessionState>("ready");
   const [visitorId, setVisitorId] = useState("");
 
   useEffect(() => {
