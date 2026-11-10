@@ -62,7 +62,7 @@ describe("public guest chat", () => {
     await expect(sendChatMessage({
       message: "ملف", conversationId: "", files: [new File(["a"], "a.txt")],
       metadata: { language: "ar", source: "web-widget", voiceEnabled: false },
-    })).rejects.toThrow("رفع الملفات");
+    })).rejects.toThrow("تتطلب تسجيل الدخول");
     expect(mocks.foundryAgentChat).not.toHaveBeenCalled();
   });
 
