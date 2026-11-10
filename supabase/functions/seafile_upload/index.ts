@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { getMetaApiVersion, requireMetaAccessToken } from "../_shared/meta-env.ts";
 
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -21,7 +23,31 @@ function json(body: unknown, status = 200) {
  * Body: { tenant_id, media_id (WA media ID), file_name, mime_type, message_id? }
  * Or: { tenant_id, file_url, file_name, mime_type }
  */
+
+/** Sensitive legacy endpoint: only server-to-server calls or verified administrators. */
+async function authorizeLegacyInvocation(req: Request): Promise<Response | null> {
+  if (req.method === "OPTIONS") return null;
+  const raw = req.headers.get("Authorization") || "";
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (serviceRole && raw === `Bearer ${serviceRole}`) return null;
+  if (!raw.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const base = Deno.env.get("SUPABASE_URL") || "";
+  if (!base || !anonKey) return new Response("Unauthorized", { status: 401 });
+  const userClient = createClient(base, anonKey, { auth: { persistSession: false } });
+  const { data: identity, error } = await userClient.auth.getUser(raw.slice(7));
+  if (error || !identity.user || identity.user.is_anonymous)
+    return new Response("Unauthorized", { status: 401 });
+  const { data: allowed, error: roleError } = await userClient.rpc("has_role", {
+    _user_id: identity.user.id, _role: "admin",
+  });
+  if (roleError || allowed !== true) return new Response("Forbidden", { status: 403 });
+  return null;
+}
+
 Deno.serve(async (req) => {
+  const authorization = await authorizeLegacyInvocation(req);
+  if (authorization) return authorization;
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -70,7 +96,10 @@ Deno.serve(async (req) => {
         return json({ error: "Failed to download media from Meta" }, 502);
       }
 
+      const waLength = Number(fileRes.headers.get("content-length") || 0);
+      if (waLength > MAX_FILE_BYTES) return json({ error: "Media too large" }, 413);
       fileBytes = new Uint8Array(await fileRes.arrayBuffer());
+      if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "Media too large" }, 413);
 
       // Generate file extension from mime
       const ext = getExtFromMime(mime_type || mediaInfo.mime_type || "");
@@ -78,11 +107,19 @@ Deno.serve(async (req) => {
         actualFileName = `wa_${media_id.substring(0, 10)}_${Date.now()}${ext}`;
       }
     } else if (file_url) {
-      const fileRes = await fetch(file_url);
+      const incoming = new URL(file_url);
+      const storageHost = new URL(supabaseUrl).hostname;
+      if (incoming.protocol !== "https:" || incoming.hostname !== storageHost || !incoming.pathname.startsWith("/storage/v1/object/")) {
+        return json({ error: "Source URL is not approved" }, 400);
+      }
+      const fileRes = await fetch(incoming.toString(), { redirect: "error" });
       if (!fileRes.ok) {
         return json({ error: "Failed to download file from URL" }, 502);
       }
+      const sourceLength = Number(fileRes.headers.get("content-length") || 0);
+      if (sourceLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
       fileBytes = new Uint8Array(await fileRes.arrayBuffer());
+      if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
     } else {
       return json({ error: "media_id or file_url is required" }, 400);
     }

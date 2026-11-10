@@ -15,10 +15,15 @@ function json(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req) => {
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const bearer = req.headers.get("Authorization");
+  if (!serviceRole || bearer !== `Bearer ${serviceRole}`) {
+    return new Response("Unauthorized", { status: 401 });
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  // Internal function - auth handled by Supabase config (verify_jwt = false)
+  // Auth verified using the service role bearer before accessing the job queue.
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 

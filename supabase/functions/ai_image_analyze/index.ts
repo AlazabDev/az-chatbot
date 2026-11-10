@@ -14,7 +14,31 @@ const supabase = createClient(
 const geminiClient = new GeminiClient(Deno.env.get("GEMINI_API_KEY")!);
 const cacheService = new ImageAnalysisCache(supabase);
 
+
+/** Sensitive legacy endpoint: only server-to-server calls or verified administrators. */
+async function authorizeLegacyInvocation(req: Request): Promise<Response | null> {
+  if (req.method === "OPTIONS") return null;
+  const raw = req.headers.get("Authorization") || "";
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (serviceRole && raw === `Bearer ${serviceRole}`) return null;
+  if (!raw.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const base = Deno.env.get("SUPABASE_URL") || "";
+  if (!base || !anonKey) return new Response("Unauthorized", { status: 401 });
+  const userClient = createClient(base, anonKey, { auth: { persistSession: false } });
+  const { data: identity, error } = await userClient.auth.getUser(raw.slice(7));
+  if (error || !identity.user || identity.user.is_anonymous)
+    return new Response("Unauthorized", { status: 401 });
+  const { data: allowed, error: roleError } = await userClient.rpc("has_role", {
+    _user_id: identity.user.id, _role: "admin",
+  });
+  if (roleError || allowed !== true) return new Response("Forbidden", { status: 403 });
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
+  const authorization = await authorizeLegacyInvocation(req);
+  if (authorization) return authorization;
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -35,8 +59,24 @@ Deno.serve(async (req: Request) => {
     // 1. حساب hash للصورة للتخزين المؤقت
     let imageData: string | Uint8Array;
     if (image_url) {
-      const response = await fetch(image_url);
-      imageData = new Uint8Array(await response.arrayBuffer());
+      let source: URL;
+      try { source = new URL(String(image_url)); }
+      catch { return createErrorResponse("Invalid image URL", 400); }
+      const storage = new URL(Deno.env.get("SUPABASE_URL")!);
+      if (source.protocol !== "https:" || source.host !== storage.host ||
+          !source.pathname.startsWith("/storage/v1/object/") ||
+          source.username || source.password) {
+        return createErrorResponse("Image source is not approved", 403);
+      }
+      const response = await fetch(source.toString(), {
+        redirect: "error", signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) return createErrorResponse("Image download failed", 502);
+      const length = Number(response.headers.get("content-length") ?? "0");
+      if (length > 10 * 1024 * 1024) return createErrorResponse("Image exceeds 10 MB", 413);
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength > 10 * 1024 * 1024) return createErrorResponse("Image exceeds 10 MB", 413);
+      imageData = new Uint8Array(bytes);
     } else if (image_base64) {
       imageData = image_base64;
     } else {

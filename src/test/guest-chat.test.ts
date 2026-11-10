@@ -62,7 +62,35 @@ describe("public guest chat", () => {
     await expect(sendChatMessage({
       message: "ملف", conversationId: "", files: [new File(["a"], "a.txt")],
       metadata: { language: "ar", source: "web-widget", voiceEnabled: false },
-    })).rejects.toThrow("رفع الملفات");
+    })).rejects.toThrow("تتطلب تسجيل الدخول");
+    expect(mocks.foundryAgentChat).not.toHaveBeenCalled();
+  });
+
+  it("allows up to two small guest images without Supabase authentication", async () => {
+    const file = new File(["image data"], "photo.png", { type: "image/png" });
+    const result = await sendChatMessage({
+      message: "ما هذه الصورة؟", conversationId: "", files: [file],
+      metadata: { language: "ar", source: "web-widget", voiceEnabled: false },
+      agentId: AGENT_A,
+    });
+    expect(result.reply).toBe("أهلاً");
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.foundryAgentChat).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        images: [expect.objectContaining({ dataUrl: expect.stringContaining("data:image/png;base64,") })],
+        agentId: AGENT_A,
+      }),
+    });
+  });
+
+  it("denies public image uploads beyond the 1 MB inline threshold", async () => {
+    mocks.getUser.mockResolvedValueOnce({ data: { user: null }, error: null });
+    await expect(sendChatMessage({
+      message: "صورة كبيرة", conversationId: "",
+      files: [new File([new Uint8Array(1_000_001)], "large.png", { type: "image/png" })],
+      metadata: { language: "ar", source: "web-widget", voiceEnabled: false },
+      agentId: AGENT_A,
+    })).rejects.toThrow("الصور للزوار");
     expect(mocks.foundryAgentChat).not.toHaveBeenCalled();
   });
 
