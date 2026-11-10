@@ -120,6 +120,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       <div className="p-2.5">
         <input
           ref={inputRef}
+          disabled={disabled}
           type="file"
           multiple
           accept={ACCEPT_ATTR}
@@ -128,6 +129,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         />
         <input
           ref={cameraRef}
+          disabled={disabled}
           type="file"
           accept="image/*"
           capture="environment"
@@ -138,6 +140,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         <div className="flex items-end gap-1.5 rounded-2xl border border-black/10 bg-[#f8f9fc] px-2 py-1.5 transition focus-within:border-[#ffb900] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(255,185,0,0.15)]">
           <button
             type="button"
+            disabled={disabled}
             onClick={() => inputRef.current?.click()}
             aria-label="إرفاق ملفات"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#030957]/70 transition hover:bg-[#030957]/5 hover:text-[#030957] focus:outline-none focus:ring-2 focus:ring-[#ffb900] sm:h-8 sm:w-8"
@@ -146,6 +149,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </button>
           <button
             type="button"
+            disabled={disabled}
             onClick={() => cameraRef.current?.click()}
             aria-label="التقاط صورة بالكاميرا"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#030957]/70 transition hover:bg-[#030957]/5 hover:text-[#030957] focus:outline-none focus:ring-2 focus:ring-[#ffb900] sm:h-8 sm:w-8"
@@ -155,11 +159,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
           <VoiceControls
             isListening={isListening}
-            supported={voiceSupported}
+            supported={voiceSupported && !disabled}
             onToggle={onToggleVoice}
           />
 
           <textarea
+            disabled={disabled}
             ref={taRef}
             rows={1}
             value={text}
