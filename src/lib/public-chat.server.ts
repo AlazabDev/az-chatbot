@@ -40,6 +40,7 @@ export interface PublicChatInput {
   threadId?: string | null;
   message: string;
   attachments?: Array<{ url: string; name: string; type: string }>;
+  images?: Array<{ dataUrl: string }>;
 }
 
 export interface PublicChatResult {
@@ -54,6 +55,7 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   const requestId = crypto.randomUUID();
   const started = Date.now();
   if (data.attachments?.length) throw new Error("ATTACHMENTS_REQUIRE_AUTH");
+  if ((data.images?.length || 0) > 2) throw new Error("TOO_MANY_IMAGES");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: agent, error } = await supabaseAdmin.from("bot_agents")
     .select("id,agent_name,agent_version,is_active")
@@ -71,6 +73,14 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   const conversationId = conversation ?? created?.id;
   if (!conversationId) throw new Error("FOUNDRY_CONVERSATION_FAILED");
 
+  const inputContent: Array<Record<string, unknown>> = [
+    { type: "input_text", text: data.message || "يرجى تحليل الصورة المرفقة." },
+  ];
+  for (const item of data.images ?? []) {
+    const match = /^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+={0,2})$/.exec(item.dataUrl);
+    if (!match || match[2].length > 1_400_000) throw new Error("INVALID_IMAGE");
+    inputContent.push({ type: "input_image", image_url: item.dataUrl });
+  }
   const response = await foundryRequest<{
     output_text?: string;
     output?: Array<{ type?: string; role?: string; content?: Array<{ type?: string; text?: string | { value?: string } }> }>;
@@ -78,7 +88,7 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     method: "POST",
     body: JSON.stringify({
       conversation: conversationId,
-      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: data.message }] }],
+      input: [{ type: "message", role: "user", content: inputContent }],
     }),
   });
   const reply = response.output_text?.trim() ||
