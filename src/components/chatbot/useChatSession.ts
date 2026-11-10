@@ -21,7 +21,11 @@ function sessionKey(agentId: string, field: "messages" | "conversationId"): stri
   return `${PREFIX}.agent.${encodeURIComponent(agentId)}.${field}`;
 }
 function loadMessages(agentId: string): ChatMessage[] {
-  const stored = parse<unknown>(sessionKey(agentId, "messages"), []);
+  const scopedKey = sessionKey(agentId, "messages");
+  // Import the legacy single-thread history only into its original agent.
+  const legacy = read(LS_AGENT_ID);
+  const legacyKey = legacy === agentId ? `${PREFIX}.messages` : null;
+  const stored = parse<unknown>(read(scopedKey) === null && legacyKey ? legacyKey : scopedKey, []);
   if (!Array.isArray(stored)) return [];
   return stored.filter((m): m is ChatMessage =>
     m != null && typeof m === "object" && typeof m.id === "string" &&
@@ -57,7 +61,7 @@ export function useChatSession({ applyTheme = true }: Options = {}) {
     setHydrated(true);
     void listPublicAgents().then((agents) => {
       if (!active) return;
-      if (agents.length && !agents.some((agent) => agent.id === storedAgent || agent.slug === storedAgent)) {
+      if (agents.length && !agents.some((agent) => agent.id === storedAgent || agent.slug === storedAgent || agent.slug === storedAgent.replace(/^az-agent-/, ""))) {
         setSelectedAgentId((current) => current === storedAgent ?
           (agents.find((agent) => agent.isDefault) ?? agents[0]).id : current);
       }
@@ -70,7 +74,8 @@ export function useChatSession({ applyTheme = true }: Options = {}) {
     if (!hydrated) return;
     setLoadedAgentId(null);
     setMessages(loadMessages(selectedAgentId));
-    setConversationId(read(sessionKey(selectedAgentId, "conversationId")) || "");
+    const scopedConversation = read(sessionKey(selectedAgentId, "conversationId"));
+    setConversationId(scopedConversation ?? (read(LS_AGENT_ID) === selectedAgentId ? read(`${PREFIX}.conversationId`) : null) ?? "");
     setLoadedAgentId(selectedAgentId);
     write(LS_AGENT_ID, selectedAgentId);
   }, [selectedAgentId, hydrated]);
