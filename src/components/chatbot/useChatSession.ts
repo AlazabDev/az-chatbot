@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { ChatMessage, ChatSettingsState } from "@/types/chat";
-import { supabase } from "@/integrations/supabase/client";
 import { listPublicAgents } from "@/lib/agents/dispatcher.functions";
 
 const LS_MESSAGES = "azab.chat.messages";
 const LS_SETTINGS = "azab.chat.settings";
 const LS_CONV_ID = "azab.chat.conversationId";
 const LS_AGENT_ID = "azab.chat.agentId";
+const LS_VISITOR_ID = "azab.chat.visitorId";
 
 export const DEFAULT_AGENT_ID = "az-agent-azabot";
 
@@ -27,7 +27,7 @@ function loadJSON<T>(key: string, fallback: T): T {
   }
 }
 
-/** `ready`: a Supabase session exists. `unavailable`: no session could be opened. */
+/** `ready` means public chat is usable; it does not imply Supabase authentication. */
 export type ChatSessionState = "pending" | "ready" | "unavailable";
 
 interface Options {
@@ -41,17 +41,17 @@ interface Options {
  * Persistent chat state shared by the floating widget and the /help portal.
  * Both use the same localStorage keys, so a conversation continues across them.
  */
-export function useChatSession({ applyTheme = true, ensureSession = false }: Options = {}) {
+export function useChatSession({ applyTheme = true }: Options = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [settings, setSettings] = useState<ChatSettingsState>(DEFAULT_SETTINGS);
   const [conversationId, setConversationId] = useState<string>("");
   const [selectedAgentId, setSelectedAgentId] = useState(DEFAULT_AGENT_ID);
   const [hydrated, setHydrated] = useState(false);
-  const [sessionState, setSessionState] = useState<ChatSessionState>(
-    ensureSession ? "pending" : "ready",
-  );
+  const sessionState: ChatSessionState = "ready";
+  const [visitorId, setVisitorId] = useState("");
 
   useEffect(() => {
+    let alive = true;
     setMessages(loadJSON<ChatMessage[]>(LS_MESSAGES, []));
     setSettings(loadJSON<ChatSettingsState>(LS_SETTINGS, DEFAULT_SETTINGS));
     let id = window.localStorage.getItem(LS_CONV_ID);
@@ -60,38 +60,25 @@ export function useChatSession({ applyTheme = true, ensureSession = false }: Opt
       window.localStorage.setItem(LS_CONV_ID, id);
     }
     setConversationId(id);
+    let visitor = window.localStorage.getItem(LS_VISITOR_ID);
+    if (!visitor || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(visitor)) {
+      visitor = crypto.randomUUID();
+      window.localStorage.setItem(LS_VISITOR_ID, visitor);
+    }
+    setVisitorId(visitor);
+    setHydrated(true);
     const storedAgent = window.localStorage.getItem(LS_AGENT_ID) || DEFAULT_AGENT_ID;
     setSelectedAgentId(storedAgent);
     void listPublicAgents().then((agents) => {
+      if (!alive) return;
       if (agents.length && !agents.some((agent) => agent.id === storedAgent)) {
         setSelectedAgentId((current) => current === storedAgent
           ? (agents.find((agent) => agent.isDefault) ?? agents[0]).id
           : current);
       }
-    }).catch(() => { /* Preserve the previous selection if discovery fails. */ })
-      .finally(() => setHydrated(true));
+    }).catch(() => { /* Preserve the previous selection if discovery fails. */ });
+    return () => { alive = false; };
   }, []);
-
-  useEffect(() => {
-    if (!ensureSession) return;
-    let alive = true;
-    (async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-          const { error } = await supabase.auth.signInAnonymously();
-          if (error) throw error;
-        }
-        if (alive) setSessionState("ready");
-      } catch (error) {
-        console.error("[chat] could not open a session", error);
-        if (alive) setSessionState("unavailable");
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [ensureSession]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -125,6 +112,7 @@ export function useChatSession({ applyTheme = true, ensureSession = false }: Opt
   return {
     hydrated,
     sessionState,
+    visitorId,
     messages,
     setMessages,
     settings,
