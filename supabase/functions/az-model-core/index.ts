@@ -34,7 +34,7 @@ function jsonResponse(data: unknown, status = 200) {
  */
 async function authorizeAgentCall(req: Request): Promise<number> {
   const auth = req.headers.get("authorization") ?? "";
-  const token = auth.match(/^Bearer\\s+(.+)$/i)?.[1]?.trim();
+  const token = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!token) return 401;
   const url = Deno.env.get("SUPABASE_URL");
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
