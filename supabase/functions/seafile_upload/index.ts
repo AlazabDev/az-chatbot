@@ -98,10 +98,7 @@ Deno.serve(async (req) => {
 
       const waLength = Number(fileRes.headers.get("content-length") || 0);
       if (waLength > MAX_FILE_BYTES) return json({ error: "Media too large" }, 413);
-      const sourceLength = Number(fileRes.headers.get("content-length") || 0);
-      if (sourceLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
       fileBytes = new Uint8Array(await fileRes.arrayBuffer());
-      if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
       if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "Media too large" }, 413);
 
       // Generate file extension from mime
@@ -119,7 +116,10 @@ Deno.serve(async (req) => {
       if (!fileRes.ok) {
         return json({ error: "Failed to download file from URL" }, 502);
       }
+      const sourceLength = Number(fileRes.headers.get("content-length") || 0);
+      if (sourceLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
       fileBytes = new Uint8Array(await fileRes.arrayBuffer());
+      if (fileBytes.byteLength > MAX_FILE_BYTES) return json({ error: "File too large" }, 413);
     } else {
       return json({ error: "media_id or file_url is required" }, 400);
     }
