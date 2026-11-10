@@ -1,112 +1,76 @@
-// Per-agent HTTP endpoint: POST /api/public/agents/<az-agent-id or slug>
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { findAgent } from "@/lib/agents/registry";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 const bodySchema = z.object({
-  message: z.string().trim().min(1).max(2000),
-  history: z
-    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) }))
-    .max(20)
-    .optional()
-    .default([]),
+  message: z.string().trim().min(1).max(8000),
+  visitorId: z.string().uuid(),
+  threadId: z.string().max(512).nullable().optional(),
 });
 
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 30;
-const rateLimit = new Map<string, number[]>();
-
-function bearerToken(request: Request): string | null {
-  const auth = request.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) return null;
-  const token = auth.slice(7).trim();
-  return token || null;
+function response(data: Record<string, unknown>, status: number, requestId: string, extra: HeadersInit = {}): Response {
+  return Response.json(data, {
+    status,
+    headers: { "Cache-Control": "no-store", "X-Request-ID": requestId, ...extra },
+  });
 }
 
-async function requireUser(request: Request): Promise<string | null> {
-  const token = bearerToken(request);
-  if (!token) return null;
-
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data.user?.id) return null;
-  return data.user.id;
-}
-
-function allowedByRateLimit(key: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const current = (rateLimit.get(key) ?? []).filter((ts) => ts > cutoff);
-
-  if (current.length >= RATE_LIMIT_MAX) {
-    rateLimit.set(key, current);
-    return false;
-  }
-
-  current.push(now);
-  rateLimit.set(key, current);
-
-  if (rateLimit.size > 10_000) {
-    for (const [entryKey, timestamps] of rateLimit) {
-      if (!timestamps.some((ts) => ts > cutoff)) rateLimit.delete(entryKey);
-      if (rateLimit.size <= 8_000) break;
-    }
-  }
-
-  return true;
-}
-
+/** Same-origin public REST gateway; embeds operate through an iframe on this origin. */
 export const Route = createFileRoute("/api/public/agents/$slug")({
   server: {
     handlers: {
-      OPTIONS: async () => new Response(null, { headers: cors }),
+      OPTIONS: async ({ request }) => {
+        const origin = request.headers.get("origin");
+        if (origin && origin !== new URL(request.url).origin) {
+          return new Response(null, { status: 403 });
+        }
+        return new Response(null, { status: 204, headers: {
+          "Access-Control-Allow-Origin": new URL(request.url).origin,
+          "Access-Control-Allow-Headers": "content-type",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          Vary: "Origin",
+        } });
+      },
       POST: async ({ request, params }) => {
-        const userId = await requireUser(request);
-        if (!userId) {
-          return Response.json({ error: "Unauthorized" }, { status: 401, headers: cors });
+        const requestId = crypto.randomUUID();
+        const origin = request.headers.get("origin");
+        if (origin && origin !== new URL(request.url).origin) {
+          return response({ error: "FORBIDDEN_ORIGIN" }, 403, requestId);
         }
-
-        if (!allowedByRateLimit(`${userId}:${params.slug}`)) {
-          return Response.json(
-            { error: "Too many requests" },
-            { status: 429, headers: { ...cors, "Retry-After": "60" } },
-          );
+        if (Number(request.headers.get("content-length") || 0) > 20_000) {
+          return response({ error: "PAYLOAD_TOO_LARGE" }, 413, requestId);
         }
-
-        const contentLength = Number(request.headers.get("content-length") ?? "0");
-        if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
-          return Response.json({ error: "Request too large" }, { status: 413, headers: cors });
-        }
-
-        const agent = findAgent(params.slug);
-        if (!agent) {
-          return Response.json({ error: "الوكيل غير موجود." }, { status: 404, headers: cors });
-        }
-
         const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          return Response.json({ error: "الرسالة مطلوبة." }, { status: 400, headers: cors });
-        }
+        if (!parsed.success) return response({ error: "INVALID_REQUEST" }, 400, requestId);
 
-        const { runAgent } = await import("@/lib/agents/az-model-core/engine.server");
-        const result = await runAgent(agent, parsed.data.message, parsed.data.history);
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: agent, error } = await supabaseAdmin.from("bot_agents")
+            .select("id,agent_name,is_default")
+            .eq("provider", "foundry").eq("is_active", true)
+            .eq("public_access", true).eq("agent_name", params.slug)
+            .maybeSingle();
+          if (error || !agent) return response({ error: "AGENT_UNAVAILABLE" }, 404, requestId);
 
-        return Response.json(
-          {
-            agent: { id: agent.id, name: agent.name },
+          const { executePublicChat } = await import("@/lib/public-chat.server");
+          const result = await executePublicChat({
+            ...parsed.data,
+            agentId: agent.id,
+          });
+          return response({
             reply: result.reply,
-            toolExecuted: result.toolExecuted
-              ? { name: result.toolExecuted.name, success: result.toolExecuted.success }
-              : undefined,
-          },
-          { headers: cors },
-        );
+            conversationId: result.threadId,
+            threadId: result.threadId,
+            agent: result.agent,
+            requestId: result.requestId,
+            sources: [], actions: [],
+          }, 200, requestId);
+        } catch (error) {
+          const text = error instanceof Error ? error.message : "";
+          const limited = text.includes("تجاوز حد");
+          console.error(JSON.stringify({ event: "public_chat_failed", requestId, kind: limited ? "rate_limit" : "gateway_error" }));
+          return response({ error: limited ? "RATE_LIMITED" : "CHAT_UNAVAILABLE", requestId },
+            limited ? 429 : 503, requestId, limited ? { "Retry-After": "60" } : {});
+        }
       },
     },
   },
