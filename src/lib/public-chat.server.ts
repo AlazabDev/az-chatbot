@@ -83,6 +83,7 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   }
   const response = await foundryRequest<{
     output_text?: string;
+    usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
     output?: Array<{ type?: string; role?: string; content?: Array<{ type?: string; text?: string | { value?: string } }> }>;
   }>("/agents/" + encodeURIComponent(agent.agent_name) + "/endpoint/protocols/openai/responses?api-version=v1", {
     method: "POST",
@@ -98,8 +99,17 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
       .filter(Boolean).join("\n").trim();
   if (!reply) throw new Error("EMPTY_FOUNDRY_RESPONSE");
   const latencyMs = Date.now() - started;
+  const inputTokens = response.usage?.input_tokens ?? null;
+  const outputTokens = response.usage?.output_tokens ?? null;
+  const inputRate = Number(process.env.FOUNDRY_INPUT_COST_PER_1M_TOKENS || "0");
+  const outputRate = Number(process.env.FOUNDRY_OUTPUT_COST_PER_1M_TOKENS || "0");
+  const estimatedUsd = inputTokens !== null && outputTokens !== null &&
+    Number.isFinite(inputRate) && Number.isFinite(outputRate)
+    ? Number(((inputTokens * inputRate + outputTokens * outputRate) / 1_000_000).toFixed(6))
+    : null;
   console.info(JSON.stringify({
     event: "public_chat_completed", requestId, agentId: agent.id, latencyMs,
+    inputTokens, outputTokens, estimatedUsd,
     messageChars: data.message.length, replyChars: reply.length,
   }));
   return {
