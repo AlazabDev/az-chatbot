@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import { loadAzureConfig, loadTrainingExamples } from "@/lib/adminConfig";
 import { getAdminOverview } from "@/lib/adminStats.functions";
 
 export const Route = createFileRoute("/admin/")({
+  head: () => pageHead("لوحة التحكم", "لوحة التحكم في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminHome,
 });
 

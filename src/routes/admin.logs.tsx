@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { ScrollText } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/admin/logs")({
+  head: () => pageHead("سجل الأحداث", "سجل الأحداث في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminLogsPage,
 });
 

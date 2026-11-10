@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BookOpen, Activity, GraduationCap, HelpCircle } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/support/")({
+  head: () => pageHead("مركز الدعم", "مركز الدعم في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: SupportHome,
 });
 

@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -8,6 +9,7 @@ import { listAgents, saveAgent } from "@/lib/agents.functions";
 import { AgentsPage } from "./admin.agents";
 
 export const Route = createFileRoute("/admin/foundry")({
+  head: () => pageHead("وكلاء Microsoft Foundry", "وكلاء Microsoft Foundry في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: FoundrySettingsPage,
 });
 

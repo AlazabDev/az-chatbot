@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { FileText, BookOpen, HelpCircle, GraduationCap, LibraryBig, Activity } from "lucide-react";
 
@@ -15,6 +16,7 @@ const supportNav: SidebarItem[] = [
 ];
 
 export const Route = createFileRoute("/support")({
+  head: () => pageHead("دعم عزبوت", "دعم عزبوت في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: SupportLayout,
 });
 

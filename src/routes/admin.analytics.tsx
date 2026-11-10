@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/admin/analytics")({
+  head: () => pageHead("إحصاءات الاستخدام", "إحصاءات الاستخدام في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminAnalyticsPage,
 });
 

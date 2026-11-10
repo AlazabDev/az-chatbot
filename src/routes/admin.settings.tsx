@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { Settings } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/admin/settings")({
+  head: () => pageHead("إعدادات النظام", "إعدادات النظام في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminSettingsPage,
 });
 

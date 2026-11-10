@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { Shield } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/admin/roles")({
+  head: () => pageHead("الأدوار والصلاحيات", "الأدوار والصلاحيات في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminRolesPage,
 });
 

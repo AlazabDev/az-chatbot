@@ -1,9 +1,11 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { Activity } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/support/diagnostics")({
+  head: () => pageHead("تشخيص الاتصال", "تشخيص الاتصال في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: SupportDiagnosticsPage,
 });
 

@@ -1,3 +1,4 @@
+import { pageHead } from "@/lib/pageHead";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -25,6 +26,7 @@ import { toUserErrorMessage } from "@/lib/chatErrors";
 import { speak } from "@/lib/voice";
 
 export const Route = createFileRoute("/admin/chat")({
+  head: () => pageHead("اختبار المحادثة", "اختبار المحادثة في منصة عزبوت للمحادثة وإدارة الوكلاء."),
   component: AdminChatPage,
 });
 
