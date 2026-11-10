@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { signConversation, verifyConversation } from "@/lib/threadTokens.server";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { foundryRequest } from "@/lib/foundry-transport.server";
 
@@ -9,38 +10,21 @@ type RequestData = {
   attachments?: Array<{ url: string; name: string; type: string }>;
 };
 
-function getSecret() {
-  const secret = process.env.THREAD_SIGNING_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!secret) throw new Error("Server thread signing secret is missing");
-  return secret;
-}
-
-function sign(id: string, agentId: string) {
-  const signature = createHmac("sha256", getSecret()).update(agentId + ":" + id).digest("hex");
-  return id + "." + signature;
-}
-
-function verify(value: string | null | undefined, agentId: string): string | null {
-  if (!value || value.length > 512) return null;
-  const i = value.lastIndexOf(".");
-  if (i <= 0) return null;
-  const id = value.slice(0, i);
-  const got = value.slice(i + 1);
-  if (!/^[0-9a-f]{64}$/i.test(got)) return null;
-  const expected = createHmac("sha256", getSecret()).update(agentId + ":" + id).digest();
-  const received = Buffer.from(got, "hex");
-  return timingSafeEqual(expected, received) ? id : null;
-}
+const chatSchema = z.object({
+  agentId: z.string().regex(UUID),
+  threadId: z.string().max(512).nullable().optional(),
+  message: z.string().trim().max(8000),
+  attachments: z.array(z.object({
+    url: z.string().url().max(4096), name: z.string().max(255), type: z.string().max(128),
+  })).max(10).default([]),
+}).refine((data) => data.message.length > 0 || data.attachments.length > 0);
 
 export const foundryAgentChat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: RequestData) => {
-    if (!UUID.test(data?.agentId || "") || typeof data.message !== "string" ||
-      !data.message.trim() || data.message.length > 8000) throw new Error("Invalid chat input");
-    return { ...data, message: data.message.trim(),
-      attachments: (data.attachments || []).slice(0, 10) };
+    return chatSchema.parse(data);
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: agent, error } = await supabaseAdmin.from("bot_agents")
       .select("id,agent_name,provider,agent_version,is_active")
@@ -49,7 +33,7 @@ export const foundryAgentChat = createServerFn({ method: "POST" })
     if (error || !agent?.agent_name) throw new Error("Selected agent is not available");
 
     // Each signed conversation is tied to its selected agent UUID.
-    let conversation = verify(data.threadId, agent.id);
+    let conversation = verifyConversation(data.threadId, agent.id, context.userId);
     if (!conversation) {
       const fresh = await foundryRequest<{ id: string }>("/openai/v1/conversations", {
         method: "POST", body: JSON.stringify({}),
@@ -64,9 +48,11 @@ export const foundryAgentChat = createServerFn({ method: "POST" })
       try {
         const url = new URL(attachment.url);
         if (url.protocol !== "https:" || !permitted || url.host !== permitted ||
-            !url.pathname.startsWith("/storage/v1/object/sign/chatbot-uploads/")) continue;
+            !decodeURIComponent(url.pathname).startsWith(`/storage/v1/object/sign/chatbot-uploads/${context.userId}/`)) continue;
         if (attachment.type.startsWith("image/")) {
           content.push({ type: "input_image", image_url: url.toString() });
+        } else {
+          content.push({ type: "input_text", text: `المرفق: ${attachment.name}\n${url.toString()}` });
         }
       } catch { /* ignore invalid URL */ }
     }
@@ -86,6 +72,6 @@ export const foundryAgentChat = createServerFn({ method: "POST" })
         .map((c) => typeof c.text === "string" ? c.text : c.text?.value || "")
         .filter(Boolean).join("\n").trim();
     if (!reply) throw new Error("Selected agent produced no answer");
-    return { reply, threadId: sign(conversation, agent.id),
+    return { reply, threadId: signConversation(conversation, agent.id, context.userId),
       agent: { id: agent.id, name: agent.agent_name, version: agent.agent_version } };
   });
