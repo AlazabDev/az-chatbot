@@ -59,8 +59,24 @@ Deno.serve(async (req: Request) => {
     // 1. حساب hash للصورة للتخزين المؤقت
     let imageData: string | Uint8Array;
     if (image_url) {
-      const response = await fetch(image_url);
-      imageData = new Uint8Array(await response.arrayBuffer());
+      let source: URL;
+      try { source = new URL(String(image_url)); }
+      catch { return createErrorResponse("Invalid image URL", 400); }
+      const storage = new URL(Deno.env.get("SUPABASE_URL")!);
+      if (source.protocol !== "https:" || source.host !== storage.host ||
+          !source.pathname.startsWith("/storage/v1/object/") ||
+          source.username || source.password) {
+        return createErrorResponse("Image source is not approved", 403);
+      }
+      const response = await fetch(source.toString(), {
+        redirect: "error", signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) return createErrorResponse("Image download failed", 502);
+      const length = Number(response.headers.get("content-length") ?? "0");
+      if (length > 10 * 1024 * 1024) return createErrorResponse("Image exceeds 10 MB", 413);
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength > 10 * 1024 * 1024) return createErrorResponse("Image exceeds 10 MB", 413);
+      imageData = new Uint8Array(bytes);
     } else if (image_base64) {
       imageData = image_base64;
     } else {
