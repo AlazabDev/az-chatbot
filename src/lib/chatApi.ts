@@ -56,16 +56,27 @@ export async function sendChatMessage({
   agentId,
 }: SendMessageArgs): Promise<ChatApiResponse> {
   const attachments: UploadedAttachment[] = [];
-  // Text-only guests never depend on Supabase authentication.
-  if (files.length > 0) {
+  const images: Array<{ dataUrl: string }> = [];
+  const inlineImages = files.length > 0 && files.every((file) =>
+    ["image/jpeg", "image/png", "image/webp"].includes(file.type)
+  );
+  if (inlineImages && files.length <= 2 && files.every((file) => file.size <= 1_000_000)) {
+    for (const file of files) {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("تعذر قراءة الصورة."));
+        reader.readAsDataURL(file);
+      });
+      images.push({ dataUrl });
+    }
+  } else if (files.length > 0) {
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
-      throw new Error("رفع الملفات متاح حالياً للمستخدمين المسجلين فقط.");
+      throw new Error("الصور للزوار حتى 1MB للصورة (بحد أقصى صورتين). الملفات الأخرى تتطلب تسجيل الدخول.");
     }
     const scope = crypto.randomUUID();
-    for (const file of files) {
-      attachments.push(await uploadFile(file, scope, authData.user.id));
-    }
+    for (const file of files) attachments.push(await uploadFile(file, scope, authData.user.id));
   }
 
   const threadId = conversationId && conversationId.includes(".") ? conversationId : null;
@@ -102,7 +113,7 @@ export async function sendChatMessage({
   const visitorId = getChatVisitorId();
 
   const result = await foundryAgentChat({
-    data: { agentId: selected.id, visitorId, threadId, message, attachments: [] },
+    data: { agentId: selected.id, visitorId, threadId, message, attachments: [], images },
   });
   return {
     reply: result.reply,
