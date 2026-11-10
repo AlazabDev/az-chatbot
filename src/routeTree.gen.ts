@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as EmbedRouteImport } from './routes/embed'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAgentsRouteImport } from './routes/admin.agents'
@@ -54,6 +55,11 @@ const AuthRoute = AuthRouteImport.update({
 const EmbedRoute = EmbedRouteImport.update({
   id: '/embed',
   path: '/embed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/embed': typeof EmbedRoute
+  '/help': typeof HelpRoute
   '/support': typeof SupportRouteWithChildren
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/ai': typeof AdminAiRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/embed': typeof EmbedRoute
+  '/help': typeof HelpRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/ai': typeof AdminAiRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/embed': typeof EmbedRoute
+  '/help': typeof HelpRoute
   '/support': typeof SupportRouteWithChildren
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/ai': typeof AdminAiRoute
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/embed'
+    | '/help'
     | '/support'
     | '/admin/agents'
     | '/admin/ai'
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/embed'
+    | '/help'
     | '/admin/agents'
     | '/admin/ai'
     | '/admin/analytics'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/embed'
+    | '/help'
     | '/support'
     | '/admin/agents'
     | '/admin/ai'
@@ -340,6 +352,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   EmbedRoute: typeof EmbedRoute
+  HelpRoute: typeof HelpRoute
   SupportRoute: typeof SupportRouteWithChildren
   ApiPublicAgentsSlugRoute: typeof ApiPublicAgentsSlugRoute
 }
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: '/embed'
       fullPath: '/embed'
       preLoaderRoute: typeof EmbedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -593,6 +613,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   EmbedRoute: EmbedRoute,
+  HelpRoute: HelpRoute,
   SupportRoute: SupportRouteWithChildren,
   ApiPublicAgentsSlugRoute: ApiPublicAgentsSlugRoute,
 }

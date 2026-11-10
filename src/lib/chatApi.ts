@@ -2,7 +2,7 @@ import type { ChatApiRequestMeta, ChatApiResponse, ChatFile } from "@/types/chat
 import { supabase } from "@/integrations/supabase/client";
 import { getChatUploadSignedUrl } from "@/lib/chatUploads.functions";
 import { dispatchMessageToAgent } from "@/lib/agents/dispatcher.functions";
-import { foundryChat } from "@/lib/foundry.functions";
+import { foundryAgentChat } from "@/lib/foundry-live.functions";
 
 const BUCKET = "chatbot-uploads";
 
@@ -67,6 +67,20 @@ export async function sendChatMessage({
 
   const threadId = conversationId && conversationId.includes(".") ? conversationId : null;
 
+  // Database-backed Foundry agents use their UUID and the agent_reference API.
+  // Legacy registry agents retain the existing dispatcher path.
+  if (agentId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId)) {
+    const result = await foundryAgentChat({
+      data: {
+        agentId,
+        threadId,
+        message,
+        attachments: attachments.map((a) => ({ url: a.url, name: a.name, type: a.type })),
+      },
+    });
+    return { reply: result.reply, conversationId: result.threadId, sources: [], actions: [] };
+  }
+
   if (agentId) {
     const attachmentLines = attachments.map(
       (attachment) => `- ${attachment.name}: ${attachment.url}`,
@@ -92,21 +106,20 @@ export async function sendChatMessage({
     };
   }
 
-  let data: { reply?: unknown; threadId?: unknown } | null = null;
-  try {
-    data = await foundryChat({
-      data: {
-        threadId,
-        message,
-        attachments: attachments.map((attachment) => ({
-          url: attachment.url,
-          name: attachment.name,
-          type: attachment.type,
-        })),
-      },
-    });
-  } catch (error) {
-    console.error("[chatApi] chat server function error:", error);
+  const { data, error } = await supabase.functions.invoke("chatbot", {
+    body: {
+      threadId,
+      message,
+      attachments: attachments.map((attachment) => ({
+        url: attachment.url,
+        name: attachment.name,
+        type: attachment.type,
+      })),
+    },
+  });
+
+  if (error) {
+    console.error("[chatApi] chatbot edge function error:", error);
     throw new Error("تعذر معالجة الطلب حالياً، يرجى المحاولة لاحقاً.");
   }
 

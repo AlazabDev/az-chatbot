@@ -27,7 +27,7 @@ const emptyDraft = (): Draft => ({
   sort_order: 0,
 });
 
-function AgentsPage() {
+export function AgentsPage() {
   const qc = useQueryClient();
   const fetchAgents = useServerFn(listAgents);
   const persist = useServerFn(saveAgent);

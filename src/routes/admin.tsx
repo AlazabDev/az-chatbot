@@ -47,6 +47,7 @@ const navItems = [
   { to: "/admin/settings", label: "الإعدادات", icon: Settings },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/admin/integration", label: "إعدادات Azure OpenAI", icon: Plug },
+  { to: "/admin/foundry", label: "وكلاء Microsoft Foundry", icon: Bot },
 ];
 
 function AdminLayout() {

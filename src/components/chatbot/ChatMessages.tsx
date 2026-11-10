@@ -11,6 +11,7 @@ interface ChatMessagesProps {
   onToggleSpeak: (msg: ChatMessage) => void;
   onRetry?: (msg: ChatMessage) => void;
   onSuggestion?: (text: string) => void;
+  suggestions?: readonly string[];
 }
 
 const SUGGESTIONS = [
@@ -33,7 +34,13 @@ function formatTime(ts: number): string {
   });
 }
 
-function EmptyState({ onSuggestion }: { onSuggestion?: (t: string) => void }) {
+function EmptyState({
+  onSuggestion,
+  suggestions = SUGGESTIONS,
+}: {
+  onSuggestion?: (t: string) => void;
+  suggestions?: readonly string[];
+}) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-8 text-center">
       <div
@@ -59,7 +66,7 @@ function EmptyState({ onSuggestion }: { onSuggestion?: (t: string) => void }) {
       </div>
       {onSuggestion && (
         <div className="mt-2 flex w-full flex-wrap justify-center gap-2">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <button
               key={s}
               type="button"
@@ -113,6 +120,7 @@ export function ChatMessages({
   onToggleSpeak,
   onRetry,
   onSuggestion,
+  suggestions,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -139,7 +147,7 @@ export function ChatMessages({
   if (messages.length === 0 && !isThinking) {
     return (
       <div className="azab-scroll flex-1 overflow-y-auto">
-        <EmptyState onSuggestion={onSuggestion} />
+        <EmptyState onSuggestion={onSuggestion} suggestions={suggestions} />
       </div>
     );
   }

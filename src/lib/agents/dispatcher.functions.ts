@@ -3,15 +3,24 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { AGENTS, classifyIntent, findAgent } from "./registry";
 
-export const listPublicAgents = createServerFn({ method: "GET" }).handler(async () =>
-  AGENTS.map((a) => ({
+export const listPublicAgents = createServerFn({ method: "GET" }).handler(async () => {
+  // Only public presentation fields. Agent prompts and provider credentials never reach the widget.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("bot_agents")
+    .select("id,name,description,agent_name,is_default")
+    .eq("is_active", true)
+    .eq("provider", "foundry")
+    .order("sort_order", { ascending: true });
+  if (error) throw new Error("تعذر تحميل الوكلاء المسجلين");
+  return (data ?? []).map((a) => ({
     id: a.id,
-    slug: a.slug,
+    slug: (a.agent_name || "azabot").replace(/^az-agent-/, ""),
     name: a.name,
-    description: a.description,
-    isDefault: Boolean(a.isDefault),
-  })),
-);
+    description: a.description || "",
+    isDefault: Boolean(a.is_default),
+  }));
+});
 
 const inputSchema = z.object({
   message: z.string().trim().min(1).max(2000),

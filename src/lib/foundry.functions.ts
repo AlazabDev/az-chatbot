@@ -314,6 +314,7 @@ export const foundryChat = createServerFn({ method: "POST" })
     try {
       const { resolveAgent } = await import("@/lib/agents.server");
       const agent = await resolveAgent(data.agentId);
+      if (data.agentId && !agent) throw new Error("E_AGENT_UNAVAILABLE");
 
       const agentName =
         agent?.agent_name || process.env.FOUNDRY_AGENT_NAME || process.env.FOUNDRY_AGENT_ID;

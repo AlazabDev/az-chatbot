@@ -1,0 +1,1 @@
+GRANT SELECT ON public.project_members TO authenticated;

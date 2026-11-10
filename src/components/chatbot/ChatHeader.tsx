@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 
 interface ChatHeaderProps {
   status: ChatStatus;
-  onClose: () => void;
+  /** Omit to hide the close button (full-page layouts). */
+  onClose?: () => void;
   onDownload: (format: ExportFormat) => void;
   onToggleSettings: () => void;
   onStartCall: () => void;
@@ -153,14 +154,16 @@ export function ChatHeader({
         >
           <SettingsIcon className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="إغلاق"
-          className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="إغلاق"
+            className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </header>
   );

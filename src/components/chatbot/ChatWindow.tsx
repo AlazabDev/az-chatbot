@@ -32,7 +32,12 @@ interface ChatWindowProps {
   setSettings: Dispatch<SetStateAction<ChatSettingsState>>;
   callRequest: number;
   selectedAgentId?: string;
-  onClose: () => void;
+  /** `floating` is the launcher popup; `page` fills its parent (used by /help). */
+  variant?: "floating" | "page";
+  /** Put text in the input box; bump `id` to apply the same text again. */
+  prefill?: { id: number; text: string };
+  suggestions?: readonly string[];
+  onClose?: () => void;
 }
 
 /** Raw File objects can't be persisted, so keep them per-session for retries. */
@@ -51,6 +56,9 @@ export function ChatWindow({
   setSettings,
   callRequest,
   selectedAgentId,
+  variant = "floating",
+  prefill,
+  suggestions,
   onClose,
 }: ChatWindowProps) {
   const [phase, setPhase] = useState<ChatPhase>("idle");
@@ -125,11 +133,18 @@ export function ChatWindow({
   };
 
   useEffect(() => {
-    if (open) {
+    // Full-page layouts must not grab focus on load (it pops the keyboard on phones).
+    if (open && variant === "floating") {
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
-  }, [open]);
+  }, [open, variant]);
+
+  useEffect(() => {
+    if (!open || !prefill?.text) return;
+    inputRef.current?.setText(prefill.text);
+    inputRef.current?.focus();
+  }, [prefill?.id, prefill?.text, open]);
 
   useEffect(() => {
     if (open && callRequest > 0) setCallOpen(true);
@@ -253,12 +268,20 @@ export function ChatWindow({
       dir="rtl"
       role="dialog"
       aria-label="Azab Assistant"
-      className="azab-pop-in fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[min(640px,calc(100dvh-7rem))] sm:w-[380px] sm:rounded-2xl"
-      style={{
-        boxShadow: "var(--azab-shadow)",
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
+      className={
+        variant === "page"
+          ? "flex h-full w-full flex-col overflow-hidden bg-white"
+          : "azab-pop-in fixed inset-0 z-[9998] flex flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[min(640px,calc(100dvh-7rem))] sm:w-[380px] sm:rounded-2xl"
+      }
+      style={
+        variant === "page"
+          ? undefined
+          : {
+              boxShadow: "var(--azab-shadow)",
+              paddingTop: "env(safe-area-inset-top)",
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }
+      }
     >
       <ChatHeader
         status={phase}
@@ -286,6 +309,7 @@ export function ChatWindow({
           onToggleSpeak={handleToggleSpeak}
           onRetry={handleRetry}
           onSuggestion={(t) => inputRef.current?.setText(t)}
+          suggestions={suggestions}
         />
         <ChatInput
           ref={inputRef}
