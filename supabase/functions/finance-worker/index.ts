@@ -66,7 +66,7 @@ async function downloadWaMedia(
   };
 }
 
-async function authorize(req: Request, tenantId: string, requireAdmin = false) {
+async function authorize(req: Request, tenantId: string) {
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace("Bearer ", "");
   if (!token) return false;
@@ -83,9 +83,7 @@ async function authorize(req: Request, tenantId: string, requireAdmin = false) {
     .eq("user_id", userId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  return Boolean(membership && (requireAdmin
-    ? ["admin", "owner"].includes(String(membership.role))
-    : ["operator", "admin", "owner"].includes(String(membership.role))));
+  return Boolean(membership && ["operator", "admin", "owner"].includes(String(membership.role)));
 }
 
 async function rollupBatch(tenantId: string, batchId: string) {
@@ -169,7 +167,11 @@ Deno.serve(async (req) => {
   const resume = body.resume === true;
   const limit = Math.min(Math.max(Number(body.limit ?? 3), 1), 5);
   if (!tenantId) return json({ error: "tenant_id is required" }, 400);
-  if (!(await authorize(req, tenantId, resume))) return json({ error: "Forbidden" }, 403);
+  // This flag changes GLOBAL worker state, not only this tenant; only internal scheduler may set it.
+  if (resume && req.headers.get("Authorization") !== `Bearer ${SERVICE_KEY}`) {
+    return json({ error: "Forbidden: worker resume requires internal service" }, 403);
+  }
+  if (!(await authorize(req, tenantId))) return json({ error: "Forbidden" }, 403);
 
   if (batchId) {
     const { data: batch } = await admin
