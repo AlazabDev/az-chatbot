@@ -16,6 +16,13 @@ describe("Conversation ownership", () => {
     vi.stubEnv("THREAD_SIGNING_SECRET", "test-only-signing-secret");
     expect(verifyConversation(signConversation("conv_123", "agent-1", "user-1"), "agent-2", "user-1")).toBeNull();
   });
+  it("prevents one public visitor from reopening another visitor's signed thread", () => {
+    vi.stubEnv("THREAD_SIGNING_SECRET", "test-only-signing-secret");
+    const token = signConversation("conv_visitor", "public-agent", "guest:visitor-a");
+    expect(verifyConversation(token, "public-agent", "guest:visitor-a")).toBe("conv_visitor");
+    expect(verifyConversation(token, "public-agent", "guest:visitor-b")).toBeNull();
+    expect(verifyConversation(token, "internal-agent", "guest:visitor-a")).toBeNull();
+  });
   it("rejects a tampered conversation identifier", () => {
     vi.stubEnv("THREAD_SIGNING_SECRET", "test-only-signing-secret");
     const token = signConversation("conv_123", "agent-1", "user-1").replace("conv_123", "conv_999");
