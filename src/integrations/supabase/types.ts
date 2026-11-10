@@ -2160,6 +2160,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_chat_gateway_budget_status: {
+        Args: never
+        Returns: Json
+      }
       consume_guest_chat_quota: {
         Args: { p_agent_id: string; p_ip_hash: string; p_visitor_id: string }
         Returns: boolean
