@@ -24,24 +24,27 @@ interface ChatHeaderProps {
 const STATUS_LABEL: Record<ChatStatus, string> = {
   idle: "متصل الآن",
   completed: "متصل الآن",
-  connecting: "يتصل...",
-  streaming: "يفكر...",
-  listening: "يستمع...",
+  connecting: "جارٍ الاتصال…",
+  streaming: "يكتب الآن…",
+  listening: "يستمع إليك…",
   error: "تعذر الاتصال",
-  offline: "لا يوجد اتصال",
+  offline: "غير متصل",
 };
 
 const STATUS_DOT: Record<ChatStatus, string> = {
-  idle: "#22c55e",
-  completed: "#22c55e",
-  connecting: "#ffb900",
-  streaming: "#ffb900",
-  listening: "#ef4444",
-  error: "#ef4444",
-  offline: "#9ca3af",
+  idle: "bg-azab-online",
+  completed: "bg-azab-online",
+  connecting: "bg-azab-amber",
+  streaming: "bg-azab-amber",
+  listening: "bg-destructive",
+  error: "bg-destructive",
+  offline: "bg-muted-foreground",
 };
 
-const PULSING: ChatStatus[] = ["connecting", "streaming"];
+const PULSING: ChatStatus[] = ["connecting", "streaming", "listening"];
+
+const iconBtn =
+  "flex h-8 w-8 items-center justify-center rounded-lg text-azab-on-navy/80 transition hover:bg-azab-on-navy/10 hover:text-azab-on-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-azab-amber";
 
 export function ChatHeader({
   status,
@@ -60,56 +63,42 @@ export function ChatHeader({
   };
 
   return (
-    <header
-      className="relative flex items-center justify-between gap-2 px-3 py-3 text-white"
-      style={{
-        background: "linear-gradient(135deg, #030957 0%, #0a1170 60%, #1a2280 100%)",
-      }}
-    >
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-md"
-          style={{
-            background: "linear-gradient(135deg, #ffb900 0%, #ffd166 100%)",
-            color: "#030957",
-          }}
-          aria-hidden
-        >
-          <Sparkles className="h-5 w-5" strokeWidth={2.4} />
+    <header className="relative flex items-center justify-between gap-2 overflow-hidden bg-gradient-to-l from-azab-navy-strong via-azab-navy to-azab-navy px-3.5 py-3 text-azab-on-navy">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-10 -top-16 h-36 w-36 rounded-full bg-azab-amber/15 blur-2xl"
+      />
+      <div className="relative flex min-w-0 items-center gap-3">
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-azab-amber text-azab-navy shadow-md ring-1 ring-azab-on-navy/20">
+          <Sparkles className="h-5 w-5" strokeWidth={2.3} aria-hidden />
           <span
-            className="absolute -bottom-0.5 -left-0.5 h-3 w-3 rounded-full border-2 border-[#030957]"
-            style={{ backgroundColor: "#22c55e" }}
+            className={cn(
+              "absolute -bottom-0.5 -left-0.5 h-3 w-3 rounded-full ring-2 ring-azab-navy",
+              STATUS_DOT[status],
+            )}
           />
         </div>
 
         <div className="min-w-0 leading-tight">
-          <div className="truncate whitespace-nowrap font-semibold">Azab Assistant</div>
-          <div className="flex items-center gap-1.5 text-xs opacity-90">
+          <div className="truncate text-[15px] font-semibold tracking-tight">مساعد العزب</div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-azab-on-navy/75" aria-live="polite">
             <span
-              className={cn("h-2 w-2 rounded-full", PULSING.includes(status) && "animate-pulse")}
-              style={{ backgroundColor: STATUS_DOT[status] }}
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                STATUS_DOT[status],
+                PULSING.includes(status) && "animate-pulse",
+              )}
             />
             {STATUS_LABEL[status]}
           </div>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          onClick={onNewChat}
-          aria-label="بدء دردشة جديدة"
-          title="دردشة جديدة"
-          className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
-        >
+      <div className="relative flex shrink-0 items-center gap-0.5">
+        <button type="button" onClick={onNewChat} aria-label="بدء دردشة جديدة" title="دردشة جديدة" className={iconBtn}>
           <MessageSquarePlus className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          onClick={onStartCall}
-          aria-label="بدء مكالمة صوتية"
-          className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
-        >
+        <button type="button" onClick={onStartCall} aria-label="بدء مكالمة صوتية" title="مكالمة صوتية" className={iconBtn}>
           <Phone className="h-4 w-4" />
         </button>
         <div className="relative">
@@ -117,16 +106,17 @@ export function ChatHeader({
             type="button"
             onClick={() => setDownloadOpen((v) => !v)}
             aria-label="تحميل المحادثة"
+            title="تحميل المحادثة"
             aria-haspopup="menu"
             aria-expanded={downloadOpen}
-            className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
+            className={iconBtn}
           >
             <Download className="h-4 w-4" />
           </button>
           {downloadOpen && (
             <div
               role="menu"
-              className="azab-pop-in absolute right-0 top-full z-10 mt-1 min-w-[140px] overflow-hidden rounded-md bg-white text-sm text-[#030957] shadow-lg ring-1 ring-black/5"
+              className="azab-pop-in absolute left-0 top-full z-20 mt-2 min-w-[160px] overflow-hidden rounded-xl border border-azab-line bg-popover p-1 text-sm text-popover-foreground shadow-xl"
             >
               {(["txt", "json", "md"] as ExportFormat[]).map((fmt) => (
                 <button
@@ -135,8 +125,8 @@ export function ChatHeader({
                   type="button"
                   onClick={() => handleDownload(fmt)}
                   className={cn(
-                    "block w-full px-3 py-2 text-right hover:bg-[#f4f5fb]",
-                    fmt === defaultExportFormat && "font-semibold",
+                    "block w-full rounded-lg px-3 py-2 text-right transition hover:bg-azab-soft",
+                    fmt === defaultExportFormat && "font-semibold text-azab-navy",
                   )}
                 >
                   {fmt === "txt" ? "نص (.txt)" : fmt === "json" ? "JSON (.json)" : "Markdown (.md)"}
@@ -145,22 +135,11 @@ export function ChatHeader({
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={onToggleSettings}
-          aria-label="الإعدادات"
-          className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
-        >
+        <button type="button" onClick={onToggleSettings} aria-label="الإعدادات" title="الإعدادات" className={iconBtn}>
           <SettingsIcon className="h-4 w-4" />
         </button>
         {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="إغلاق"
-            className="rounded-md p-1.5 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
-          >
+          <button type="button" onClick={onClose} aria-label="إغلاق" title="إغلاق" className={iconBtn}>
             <X className="h-4 w-4" />
           </button>
         )}

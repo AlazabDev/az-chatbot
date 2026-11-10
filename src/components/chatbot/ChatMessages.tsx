@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, Bot, FileText, Pause, RotateCcw, Sparkles, User, Volume2 } from "lucide-react";
+import {
+  ArrowDown,
+  Bot,
+  Check,
+  Copy,
+  FileText,
+  Pause,
+  RotateCcw,
+  Sparkles,
+  Volume2,
+} from "lucide-react";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +25,10 @@ interface ChatMessagesProps {
 }
 
 const SUGGESTIONS = [
-  "كيف يمكنني مساعدتك؟",
-  "اشرح لي ميزات المنصة",
-  "أريد تجربة سريعة",
-  "تواصل مع الدعم",
+  "ما الخدمات التي تقدمونها؟",
+  "أريد متابعة طلب صيانة",
+  "كيف أتواصل مع فريق الدعم؟",
+  "اعرض لي حالة مشروعي",
 ];
 
 function formatBytes(bytes: number): string {
@@ -28,10 +38,39 @@ function formatBytes(bytes: number): string {
 }
 
 function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString("ar-EG", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return new Date(ts).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Renders **bold** segments safely without HTML injection. */
+function RichText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith("**") && p.endsWith("**") && p.length > 4 ? (
+          <strong key={i} className="font-semibold">
+            {p.slice(2, -2)}
+          </strong>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function AssistantAvatar({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-azab-amber text-azab-navy shadow-sm ring-1 ring-azab-navy/10",
+        className,
+      )}
+      aria-hidden
+    >
+      <Bot className="h-4 w-4" />
+    </div>
+  );
 }
 
 function EmptyState({
@@ -42,38 +81,32 @@ function EmptyState({
   suggestions?: readonly string[];
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-8 text-center">
-      <div
-        className="relative flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg"
-        style={{
-          background: "linear-gradient(135deg, #ffb900 0%, #ffd166 100%)",
-          color: "#030957",
-        }}
-      >
-        <Sparkles className="h-8 w-8" />
-        <span
-          className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white shadow"
-          style={{ backgroundColor: "#030957" }}
-        >
-          <Bot className="h-3 w-3 text-white" />
-        </span>
+    <div className="flex h-full flex-col items-center justify-center gap-5 px-6 py-8 text-center">
+      <div className="relative">
+        <div aria-hidden className="absolute inset-0 -z-10 scale-150 rounded-full bg-azab-amber/20 blur-2xl" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-azab-navy to-azab-navy-strong text-azab-amber shadow-lg">
+          <Sparkles className="h-8 w-8" />
+        </div>
       </div>
       <div>
-        <div className="text-lg font-bold" style={{ color: "#030957" }}>
-          مرحباً! أنا Azab 👋
+        <div className="text-lg font-bold text-azab-navy">أهلاً بك في العزب</div>
+        <div className="mt-1.5 max-w-[260px] text-sm leading-relaxed text-muted-foreground">
+          اسألني عن خدماتنا أو مشروعك، وسأوجهك إلى الوكيل المتخصص المناسب.
         </div>
-        <div className="mt-1 text-sm text-muted-foreground">كيف يمكنني مساعدتك اليوم؟</div>
       </div>
       {onSuggestion && (
-        <div className="mt-2 flex w-full flex-wrap justify-center gap-2">
+        <div className="mt-1 grid w-full max-w-[320px] gap-2">
           {suggestions.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => onSuggestion(s)}
-              className="rounded-full border border-[#030957]/10 bg-white px-3 py-1.5 text-xs text-[#030957] shadow-sm transition hover:border-[#ffb900] hover:bg-[#fff8e0] focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
+              className="group flex items-center justify-between gap-2 rounded-xl border border-azab-line bg-azab-surface px-3.5 py-2.5 text-right text-[13px] text-azab-navy shadow-sm transition hover:-translate-y-px hover:border-azab-amber hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-azab-amber"
             >
-              {s}
+              <span>{s}</span>
+              <span className="text-azab-amber opacity-0 transition group-hover:opacity-100" aria-hidden>
+                ←
+              </span>
             </button>
           ))}
         </div>
@@ -84,31 +117,37 @@ function EmptyState({
 
 function TypingIndicator() {
   return (
-    <div className="flex items-end gap-2">
-      <div
-        className="flex h-7 w-7 items-center justify-center rounded-full shadow-sm"
-        style={{ backgroundColor: "#ffb900", color: "#030957" }}
-      >
-        <Bot className="h-4 w-4" />
-      </div>
-      <div
-        className="flex items-center gap-1 rounded-2xl px-4 py-3 shadow-sm"
-        style={{ backgroundColor: "var(--azab-assistant-bubble)" }}
-      >
-        <span
-          className="azab-typing-dot h-2 w-2 rounded-full"
-          style={{ backgroundColor: "#030957" }}
-        />
-        <span
-          className="azab-typing-dot h-2 w-2 rounded-full"
-          style={{ backgroundColor: "#030957" }}
-        />
-        <span
-          className="azab-typing-dot h-2 w-2 rounded-full"
-          style={{ backgroundColor: "#030957" }}
-        />
+    <div className="azab-fade-up flex items-end gap-2" role="status" aria-label="المساعد يكتب">
+      <AssistantAvatar />
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-azab-line bg-azab-soft px-4 py-3.5">
+        <span className="azab-typing-dot h-1.5 w-1.5 rounded-full bg-azab-navy/70" />
+        <span className="azab-typing-dot h-1.5 w-1.5 rounded-full bg-azab-navy/70" />
+        <span className="azab-typing-dot h-1.5 w-1.5 rounded-full bg-azab-navy/70" />
       </div>
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* clipboard unavailable */
+        }
+      }}
+      aria-label={copied ? "تم النسخ" : "نسخ الرد"}
+      title={copied ? "تم النسخ" : "نسخ"}
+      className="rounded p-1 text-azab-navy/50 transition hover:bg-azab-soft hover:text-azab-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-azab-amber"
+    >
+      {copied ? <Check className="h-3 w-3 text-azab-online" /> : <Copy className="h-3 w-3" />}
+    </button>
   );
 }
 
@@ -131,12 +170,10 @@ export function ChatMessages({
     setPinned(true);
   }, []);
 
-  // Track whether the user is reading history; never yank them back down.
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setPinned(distance < 80);
+    setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
   }, []);
 
   useEffect(() => {
@@ -158,16 +195,18 @@ export function ChatMessages({
         <button
           type="button"
           onClick={() => scrollToBottom()}
-          className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#030957] px-3 py-2 text-xs font-medium text-white shadow-lg transition hover:bg-[#0a1170] focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
+          className="azab-pop-in absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-azab-navy px-3.5 py-2 text-xs font-medium text-azab-on-navy shadow-lg transition hover:bg-azab-navy-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-azab-amber"
         >
           <ArrowDown className="h-3.5 w-3.5" />
-          العودة لآخر رسالة
+          أحدث الرسائل
         </button>
       )}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="azab-scroll flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-4 py-4 overscroll-contain"
+        role="log"
+        aria-live="polite"
+        className="azab-scroll flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-4 py-5 overscroll-contain"
       >
         {messages.map((m) => {
           const isUser = m.role === "user";
@@ -176,43 +215,23 @@ export function ChatMessages({
           return (
             <div
               key={m.id}
-              className={cn(
-                "azab-fade-up flex items-end gap-2",
-                isUser ? "flex-row-reverse" : "flex-row",
-              )}
+              className={cn("azab-fade-up flex items-end gap-2", isUser ? "flex-row-reverse" : "flex-row")}
             >
-              <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-sm"
-                style={{
-                  backgroundColor: isUser ? "#030957" : "#ffb900",
-                  color: isUser ? "#ffffff" : "#030957",
-                }}
-                aria-hidden
-              >
-                {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-              </div>
+              {!isUser && <AssistantAvatar />}
 
-              <div
-                className={cn(
-                  "flex max-w-[78%] flex-col gap-1",
-                  isUser ? "items-end" : "items-start",
-                )}
-              >
+              <div className={cn("flex max-w-[82%] flex-col gap-1", isUser ? "items-end" : "items-start")}>
                 <div
                   dir={dir}
-                  className="whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm"
-                  style={{
-                    background: m.failed
-                      ? "#fef2f2"
+                  className={cn(
+                    "whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-[14px] leading-7",
+                    m.failed
+                      ? "border border-destructive/30 bg-destructive/5 text-destructive"
                       : isUser
-                        ? "linear-gradient(135deg, #030957 0%, #1a2280 100%)"
-                        : "var(--azab-assistant-bubble)",
-                    color: m.failed ? "#b91c1c" : isUser ? "#ffffff" : "#030957",
-                    borderBottomRightRadius: isUser ? 6 : undefined,
-                    borderBottomLeftRadius: !isUser ? 6 : undefined,
-                  }}
+                        ? "rounded-br-md bg-gradient-to-br from-azab-navy to-azab-navy-strong text-azab-on-navy shadow-sm"
+                        : "rounded-bl-md border border-azab-line bg-azab-soft text-azab-navy",
+                  )}
                 >
-                  {m.content}
+                  <RichText text={m.content} />
 
                   {m.files && m.files.length > 0 && (
                     <div className="mt-2 space-y-1.5">
@@ -221,15 +240,11 @@ export function ChatMessages({
                           key={f.id}
                           className={cn(
                             "flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs",
-                            isUser ? "bg-white/15" : "bg-white",
+                            isUser ? "bg-azab-on-navy/15" : "bg-azab-surface",
                           )}
                         >
                           {f.dataUrl ? (
-                            <img
-                              src={f.dataUrl}
-                              alt={f.name}
-                              className="h-8 w-8 rounded object-cover"
-                            />
+                            <img src={f.dataUrl} alt={f.name} className="h-8 w-8 rounded object-cover" />
                           ) : (
                             <FileText className="h-4 w-4 shrink-0" />
                           )}
@@ -245,7 +260,7 @@ export function ChatMessages({
                   <button
                     type="button"
                     onClick={() => onRetry(m)}
-                    className="flex min-h-[36px] items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 shadow-sm transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
+                    className="flex min-h-[34px] items-center gap-1.5 rounded-full border border-destructive/30 bg-azab-surface px-3 py-1.5 text-xs font-medium text-destructive shadow-sm transition hover:bg-destructive/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-azab-amber"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     إعادة المحاولة
@@ -254,17 +269,18 @@ export function ChatMessages({
 
                 <div
                   className={cn(
-                    "flex items-center gap-2 px-1 text-[10px] text-muted-foreground",
+                    "flex items-center gap-1 px-1 text-[10px] text-muted-foreground",
                     isUser ? "flex-row-reverse" : "flex-row",
                   )}
                 >
                   <span>{formatTime(m.timestamp)}</span>
+                  {!isUser && !m.failed && m.content && <CopyButton text={m.content} />}
                   {!isUser && !m.failed && voiceRepliesEnabled && (
                     <button
                       type="button"
                       onClick={() => onToggleSpeak(m)}
                       aria-label={isSpeaking ? "إيقاف القراءة" : "قراءة الرد"}
-                      className="rounded p-0.5 text-[#030957]/60 transition hover:bg-[#030957]/5 hover:text-[#030957] focus:outline-none focus:ring-2 focus:ring-[#ffb900]"
+                      className="rounded p-1 text-azab-navy/50 transition hover:bg-azab-soft hover:text-azab-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-azab-amber"
                     >
                       {isSpeaking ? <Pause className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
                     </button>
