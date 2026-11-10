@@ -40,7 +40,11 @@ function clientIdentity(visitorId: string): string {
 
 async function enforceGuestLimit(visitorId: string, agentId: string): Promise<void> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.rpc("consume_guest_chat_quota", {
+  // The migration introduces a new RPC that is not yet present in generated Database types.
+  const quotaClient = supabaseAdmin as unknown as {
+    rpc: (name: string, args: Record<string, string>) => Promise<{ data: boolean | null; error: { code?: string } | null }>;
+  };
+  const { data, error } = await quotaClient.rpc("consume_guest_chat_quota", {
     p_visitor_id: visitorId,
     p_ip_hash: clientIdentity(visitorId),
     p_agent_id: agentId,
