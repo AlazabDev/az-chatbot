@@ -7,7 +7,7 @@ const bodySchema = z.object({
   threadId: z.string().max(512).nullable().optional(),
 });
 
-function response(data: Record<string, unknown>, status: number, requestId: string, extra: HeadersInit = {}): Response {
+function response(data: Record<string, unknown>, status: number, requestId: string, extra: Record<string, string> = {}): Response {
   return Response.json(data, {
     status,
     headers: { "Cache-Control": "no-store", "X-Request-ID": requestId, ...extra },
