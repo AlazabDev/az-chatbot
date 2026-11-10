@@ -1,0 +1,33 @@
+name: Chatbot Staging Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 8
+    env:
+      STAGING_URL: ${{ secrets.CHATBOT_STAGING_URL }}
+    steps:
+      - name: Validate staging target
+        run: |
+          test -n "$STAGING_URL" || { echo "Missing CHATBOT_STAGING_URL secret"; exit 1; }
+          case "$STAGING_URL" in
+            https://*) ;;
+            *) echo "Staging URL must use HTTPS"; exit 1 ;;
+          esac
+      - name: Public landing
+        run: curl --fail --silent --show-error --location --retry 2 --max-time 25 "$STAGING_URL/"
+      - name: Help portal
+        run: curl --fail --silent --show-error --location --retry 2 --max-time 25 "$STAGING_URL/help" > /dev/null
+      - name: Embed widget script
+        run: curl --fail --silent --show-error --retry 2 --max-time 25 "$STAGING_URL/embed.js" > /dev/null
+      - name: Backend and database readiness
+        run: |
+          response="$(curl --fail --silent --show-error --retry 2 --max-time 25 "$STAGING_URL/api/health")"
+          echo "$response" | grep -q '"status":"ok"' || { echo "Readiness check failed"; exit 1; }
