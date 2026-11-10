@@ -1,7 +1,7 @@
 import type { ChatApiRequestMeta, ChatApiResponse, ChatFile } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { getChatUploadSignedUrl } from "@/lib/chatUploads.functions";
-import { dispatchMessageToAgent } from "@/lib/agents/dispatcher.functions";
+import { listPublicAgents } from "@/lib/agents/dispatcher.functions";
 import { foundryAgentChat } from "@/lib/foundry-live.functions";
 import { foundryChat } from "@/lib/foundry.functions";
 
@@ -55,77 +55,65 @@ export async function sendChatMessage({
   agentId,
 }: SendMessageArgs): Promise<ChatApiResponse> {
   const attachments: UploadedAttachment[] = [];
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError || !authData.user) {
-    throw new Error("يجب أن تكون الجلسة صالحة لإرسال الملفات.");
-  }
-
-  const scope = crypto.randomUUID();
-
-  for (const file of files) {
-    attachments.push(await uploadFile(file, scope, authData.user.id));
+  // Text-only guests never depend on Supabase authentication.
+  if (files.length > 0) {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      throw new Error("رفع الملفات متاح حالياً للمستخدمين المسجلين فقط.");
+    }
+    const scope = crypto.randomUUID();
+    for (const file of files) {
+      attachments.push(await uploadFile(file, scope, authData.user.id));
+    }
   }
 
   const threadId = conversationId && conversationId.includes(".") ? conversationId : null;
 
-  // Database-backed Foundry agents use their UUID and the agent_reference API.
-  // Legacy registry agents retain the existing dispatcher path.
-  if (agentId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId)) {
-    const result = await foundryAgentChat({
+  // Preserve the existing authenticated upload endpoint for attachments.
+  if (attachments.length > 0) {
+    const data = await foundryChat({
       data: {
-        agentId,
         threadId,
         message,
-        attachments: attachments.map((a) => ({ url: a.url, name: a.name, type: a.type })),
+        agentId: agentId || null,
+        attachments: attachments.map(({ url, name, type }) => ({ url, name, type })),
       },
     });
-    return { reply: result.reply, conversationId: result.threadId, sources: [], actions: [] };
-  }
-
-  if (agentId) {
-    const attachmentLines = attachments.map(
-      (attachment) => `- ${attachment.name}: ${attachment.url}`,
-    );
-    const routedMessage = attachmentLines.length
-      ? `${message}\n\nالمرفقات:\n${attachmentLines.join("\n")}`
-      : message;
-
-    const routed = await dispatchMessageToAgent({
-      data: {
-        message: routedMessage,
-        currentAgentId: agentId,
-        forceAgentId: agentId,
-        history: [],
-      },
-    });
-
     return {
-      reply: routed.reply,
-      conversationId,
+      reply: data.reply,
+      conversationId: typeof data.threadId === "string" ? data.threadId : conversationId,
       sources: [],
       actions: [],
     };
   }
 
-  const data = await foundryChat({
-    data: {
-      threadId,
-      message,
-      attachments: attachments.map((attachment) => ({
-        url: attachment.url,
-        name: attachment.name,
-        type: attachment.type,
-      })),
-    },
-  });
-
-  if (!data || typeof data.reply !== "string") {
-    throw new Error("تعذر معالجة الطلب حالياً، يرجى المحاولة لاحقاً.");
+  // Only explicitly active database-backed Foundry agents are publicly callable.
+  const agents = await listPublicAgents();
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const chosen = agents.find((agent) => agent.id === agentId || agent.slug === agentId);
+  const selected = chosen ?? (!agentId || agentId === "az-agent-azabot"
+    ? (agents.find((agent) => agent.isDefault) ?? agents[0])
+    : null);
+  if (!selected || (agentId && uuidPattern.test(agentId) && selected.id !== agentId)) {
+    throw new Error("الوكيل المطلوب غير متاح للزوار.");
   }
 
+  const visitorKey = "azab.chat.visitorId";
+  let visitorId: string;
+  try {
+    const saved = window.localStorage.getItem(visitorKey);
+    visitorId = saved && uuidPattern.test(saved) ? saved : crypto.randomUUID();
+    window.localStorage.setItem(visitorKey, visitorId);
+  } catch {
+    visitorId = crypto.randomUUID();
+  }
+
+  const result = await foundryAgentChat({
+    data: { agentId: selected.id, visitorId, threadId, message, attachments: [] },
+  });
   return {
-    reply: data.reply || "…",
-    conversationId: typeof data.threadId === "string" ? data.threadId : conversationId,
+    reply: result.reply,
+    conversationId: result.threadId,
     sources: [],
     actions: [],
   };
