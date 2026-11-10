@@ -504,6 +504,47 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_gateway_usage: {
+        Row: {
+          agent_id: string
+          created_at: string
+          estimated_cost_usd: number | null
+          input_tokens: number | null
+          latency_ms: number
+          outcome: string
+          output_tokens: number | null
+          request_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          estimated_cost_usd?: number | null
+          input_tokens?: number | null
+          latency_ms: number
+          outcome: string
+          output_tokens?: number | null
+          request_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          estimated_cost_usd?: number | null
+          input_tokens?: number | null
+          latency_ms?: number
+          outcome?: string
+          output_tokens?: number | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_gateway_usage_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "bot_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_requests: {
         Row: {
           agent_snapshot: Json | null
