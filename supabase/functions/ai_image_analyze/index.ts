@@ -1,3 +1,4 @@
+import { hasInternalWorkerAuthorization } from "../_shared/internal-worker-auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { corsHeaders, createErrorResponse, createSuccessResponse } from "./utils.ts";
 import { GeminiClient } from "./gemini.client.ts";
@@ -19,6 +20,8 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  if (!hasInternalWorkerAuthorization(req)) return createErrorResponse("Unauthorized", 401);
 
   try {
     const { image_url, image_base64, image_buffer, caption, conversation_id, request_id } =
