@@ -77,7 +77,7 @@ describe("public guest chat", () => {
     expect(mocks.getUser).not.toHaveBeenCalled();
     expect(mocks.foundryAgentChat).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        images: [expect.objectContaining({ dataUrl: expect.stringMatching(/^data:image\\/png;base64,/) })],
+        images: [expect.objectContaining({ dataUrl: expect.stringContaining("data:image/png;base64,") })],
         agentId: AGENT_A,
       }),
     });
