@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { signConversation, verifyConversation } from "@/lib/threadTokens.server";
 import { z } from "zod";
 import { getRequest } from "@tanstack/react-start/server";
+import { createHmac } from "node:crypto";
 import { foundryRequest } from "@/lib/foundry-transport.server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,28 +21,35 @@ const chatSchema = z.object({
   })).max(10).default([]),
 });
 
-// Per-instance abuse control. Production multi-instance hosting also needs
-// a gateway/shared-store rate limiter (IP data is proxy-dependent).
-const limits = new Map<string, { count: number; resetAt: number }>();
-function enforceGuestLimit(visitorId: string): void {
-  const headers = getRequest().headers;
-  const ip = headers.get("cf-connecting-ip") || headers.get("x-real-ip") ||
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const now = Date.now();
-  if (limits.size > 10_000) {
-    for (const [key, state] of limits) {
-      if (state.resetAt <= now) limits.delete(key);
-    }
+/**
+ * Resolve an address only from a header explicitly trusted by deployment configuration.
+ * Without that configuration the global/visitor/agent DB quotas still apply.
+ */
+function clientIdentity(visitorId: string): string {
+  const trustedHeader = process.env.CHAT_TRUSTED_IP_HEADER?.toLowerCase();
+  const allowed = ["cf-connecting-ip", "x-real-ip", "x-forwarded-for"];
+  let address: string | null = null;
+  if (trustedHeader && allowed.includes(trustedHeader)) {
+    const header = getRequest().headers.get(trustedHeader);
+    address = header?.split(",")[0]?.trim() || null;
   }
-  for (const key of [`visitor:${visitorId}`, ...(ip ? [`ip:${ip}`] : [])]) {
-    const state = limits.get(key);
-    if (!state || state.resetAt <= now) {
-      limits.set(key, { count: 1, resetAt: now + 60_000 });
-    } else {
-      if (state.count >= 12) throw new Error("تم تجاوز حد الرسائل. حاول بعد دقيقة.");
-      state.count++;
-    }
+  const secret = process.env.CHAT_GATEWAY_HASH_SECRET || process.env.THREAD_SIGNING_SECRET;
+  if (!secret) throw new Error("Chat gateway signing secret is not configured");
+  return createHmac("sha256", secret).update(address ? `ip:${address}` : `visitor:${visitorId}`).digest("hex");
+}
+
+async function enforceGuestLimit(visitorId: string, agentId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.rpc("consume_guest_chat_quota", {
+    p_visitor_id: visitorId,
+    p_ip_hash: clientIdentity(visitorId),
+    p_agent_id: agentId,
+  });
+  if (error) {
+    console.error("[chat-gateway] quota store unavailable", error.code);
+    throw new Error("خدمة المحادثة غير متاحة مؤقتاً.");
   }
+  if (data !== true) throw new Error("تم تجاوز حد استخدام المحادثة. حاول لاحقاً.");
 }
 
 export const foundryAgentChat = createServerFn({ method: "POST" })
@@ -50,13 +58,13 @@ export const foundryAgentChat = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     if (data.attachments.length) throw new Error("المرفقات تتطلب جلسة مسجلة.");
-    enforceGuestLimit(data.visitorId);
+    await enforceGuestLimit(data.visitorId, data.agentId);
     const visitorScope = `guest:${data.visitorId}`;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: agent, error } = await supabaseAdmin.from("bot_agents")
       .select("id,agent_name,provider,agent_version,is_active")
       .eq("id", data.agentId).eq("provider", "foundry")
-      .eq("is_active", true).maybeSingle();
+      .eq("is_active", true).eq("public_access", true).maybeSingle();
     if (error || !agent?.agent_name) throw new Error("Selected agent is not available");
 
     // Each signed conversation is tied to its selected agent UUID.
