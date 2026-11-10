@@ -1,21 +1,26 @@
-/** Browser storage wrapper: preserves the current tab's chat when storage is blocked. */
+/** Browser storage wrapper: memory fallback only when localStorage is unavailable. */
 const transient = new Map<string, string>();
+let storageUnavailable = false;
 
 export function getChatStorage(key: string): string | null {
-  if (typeof window === "undefined") return transient.get(key) ?? null;
+  if (typeof window === "undefined") return null;
+  if (storageUnavailable) return transient.get(key) ?? null;
   try {
-    const stored = window.localStorage.getItem(key);
-    return stored ?? transient.get(key) ?? null;
+    const value = window.localStorage.getItem(key);
+    if (value === null) transient.delete(key);
+    return value;
   } catch {
+    storageUnavailable = true;
     return transient.get(key) ?? null;
   }
 }
 
 export function setChatStorage(key: string, value: string): void {
-  transient.set(key, value);
   if (typeof window === "undefined") return;
+  transient.set(key, value);
+  if (storageUnavailable) return;
   try { window.localStorage.setItem(key, value); }
-  catch { /* Keep ephemeral state in memory. */ }
+  catch { storageUnavailable = true; }
 }
 
 const VISITOR_KEY = "azab.chat.visitorId";
