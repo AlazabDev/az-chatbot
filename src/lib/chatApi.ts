@@ -4,6 +4,7 @@ import { getChatUploadSignedUrl } from "@/lib/chatUploads.functions";
 import { listPublicAgents } from "@/lib/agents/dispatcher.functions";
 import { foundryAgentChat } from "@/lib/foundry-live.functions";
 import { foundryChat } from "@/lib/foundry.functions";
+import { getChatVisitorId } from "@/lib/chatStorage";
 
 const BUCKET = "chatbot-uploads";
 
@@ -98,15 +99,7 @@ export async function sendChatMessage({
     throw new Error("الوكيل المطلوب غير متاح للزوار.");
   }
 
-  const visitorKey = "azab.chat.visitorId";
-  let visitorId: string;
-  try {
-    const saved = window.localStorage.getItem(visitorKey);
-    visitorId = saved && uuidPattern.test(saved) ? saved : crypto.randomUUID();
-    window.localStorage.setItem(visitorKey, visitorId);
-  } catch {
-    visitorId = crypto.randomUUID();
-  }
+  const visitorId = getChatVisitorId();
 
   const result = await foundryAgentChat({
     data: { agentId: selected.id, visitorId, threadId, message, attachments: [] },
