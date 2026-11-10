@@ -1,6 +1,7 @@
 name: Chatbot Quality Gate
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
