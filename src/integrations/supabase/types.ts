@@ -504,6 +504,30 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_guest_state: {
+        Row: {
+          visitor_id: string
+          agent_id: string
+          thread_token: string
+          messages: Json
+          updated_at: string
+        }
+        Insert: {
+          visitor_id: string
+          agent_id: string
+          thread_token?: string
+          messages?: Json
+          updated_at?: string
+        }
+        Update: {
+          visitor_id?: string
+          agent_id?: string
+          thread_token?: string
+          messages?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_gateway_usage: {
         Row: {
           agent_id: string
@@ -2125,6 +2149,16 @@ export type Database = {
       finalize_guest_chat_budget: {
         Args: { p_request_id: string; p_actual_usd: number }
         Returns: boolean
+      }
+      append_guest_chat_turn: {
+        Args: {
+          p_visitor_id: string
+          p_agent_id: string
+          p_thread_token: string
+          p_message: string
+          p_reply: string
+        }
+        Returns: undefined
       }
       consume_guest_chat_quota: {
         Args: { p_agent_id: string; p_ip_hash: string; p_visitor_id: string }
