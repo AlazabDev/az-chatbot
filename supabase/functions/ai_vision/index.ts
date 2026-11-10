@@ -1,4 +1,3 @@
-import { hasInternalWorkerAuthorization } from "../_shared/internal-worker-auth.ts";
 /**
  * ai_vision — Edge Function
  * ══════════════════════════
@@ -48,8 +47,31 @@ function makeSupabase() {
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
+
+/** Sensitive legacy endpoint: only server-to-server calls or verified administrators. */
+async function authorizeLegacyInvocation(req: Request): Promise<Response | null> {
+  if (req.method === "OPTIONS") return null;
+  const raw = req.headers.get("Authorization") || "";
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (serviceRole && raw === `Bearer ${serviceRole}`) return null;
+  if (!raw.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const base = Deno.env.get("SUPABASE_URL") || "";
+  if (!base || !anonKey) return new Response("Unauthorized", { status: 401 });
+  const userClient = createClient(base, anonKey, { auth: { persistSession: false } });
+  const { data: identity, error } = await userClient.auth.getUser(raw.slice(7));
+  if (error || !identity.user || identity.user.is_anonymous)
+    return new Response("Unauthorized", { status: 401 });
+  const { data: allowed, error: roleError } = await userClient.rpc("has_role", {
+    _user_id: identity.user.id, _role: "admin",
+  });
+  if (roleError || allowed !== true) return new Response("Forbidden", { status: 403 });
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
-  if (!hasInternalWorkerAuthorization(req)) return new Response("Unauthorized", { status: 401 });
+  const authorization = await authorizeLegacyInvocation(req);
+  if (authorization) return authorization;
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
