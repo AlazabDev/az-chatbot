@@ -21,10 +21,21 @@ ALTER TABLE public.chat_gateway_reservations ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.chat_gateway_reservations FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.chat_gateway_reservations TO service_role;
 
+CREATE TABLE IF NOT EXISTS public.chat_gateway_alerts (
+  day date NOT NULL,
+  code text NOT NULL,
+  severity text NOT NULL CHECK (severity IN ('warning','critical')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(day,code)
+);
+ALTER TABLE public.chat_gateway_alerts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.chat_gateway_alerts FROM PUBLIC, anon, authenticated;
+GRANT SELECT,INSERT ON public.chat_gateway_alerts TO service_role;
+
 CREATE OR REPLACE FUNCTION public.reserve_guest_chat_budget(
   p_request_id uuid, p_reserve_usd numeric, p_daily_limit_usd numeric
 ) RETURNS boolean LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
-DECLARE d date := (now() at time zone 'UTC')::date; accepted boolean;
+DECLARE d date := (now() at time zone 'UTC')::date; accepted boolean; total_reserved numeric;
 BEGIN
  IF p_request_id IS NULL OR p_reserve_usd IS NULL OR p_daily_limit_usd IS NULL
     OR p_reserve_usd <= 0 OR p_daily_limit_usd <= 0
@@ -34,8 +45,16 @@ BEGIN
  ON CONFLICT (day) DO UPDATE
  SET reserved_usd=b.reserved_usd+EXCLUDED.reserved_usd,updated_at=now()
  WHERE b.reserved_usd + EXCLUDED.reserved_usd <= p_daily_limit_usd
- RETURNING true INTO accepted;
- IF accepted IS DISTINCT FROM true THEN RETURN false; END IF;
+ RETURNING true,reserved_usd INTO accepted,total_reserved;
+ IF accepted IS DISTINCT FROM true THEN
+   INSERT INTO public.chat_gateway_alerts(day,code,severity) VALUES(d,'daily_budget_exhausted','critical')
+   ON CONFLICT DO NOTHING;
+   RETURN false;
+ END IF;
+ IF total_reserved >= p_daily_limit_usd*0.8 THEN
+   INSERT INTO public.chat_gateway_alerts(day,code,severity) VALUES(d,'daily_budget_80_percent','warning')
+   ON CONFLICT DO NOTHING;
+ END IF;
  INSERT INTO public.chat_gateway_reservations(request_id,day,reserved_usd)
  VALUES(p_request_id,d,p_reserve_usd);
  RETURN true;
