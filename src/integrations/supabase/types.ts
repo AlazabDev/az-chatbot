@@ -2114,6 +2114,18 @@ export type Database = {
         }
         Returns: Json
       }
+      reserve_guest_chat_budget: {
+        Args: {
+          p_request_id: string
+          p_reserve_usd: number
+          p_daily_limit_usd: number
+        }
+        Returns: boolean
+      }
+      finalize_guest_chat_budget: {
+        Args: { p_request_id: string; p_actual_usd: number }
+        Returns: boolean
+      }
       consume_guest_chat_quota: {
         Args: { p_agent_id: string; p_ip_hash: string; p_visitor_id: string }
         Returns: boolean
