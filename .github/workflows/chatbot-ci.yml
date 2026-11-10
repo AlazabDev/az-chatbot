@@ -20,11 +20,11 @@ jobs:
         with:
           bun-version: '1.3.3'
       - run: bun install --frozen-lockfile
+      - name: Build and regenerate TanStack route tree
+        run: bun run build
       - name: TypeScript
         run: bunx tsc --noEmit
       - name: ESLint
         run: bun run lint
       - name: Vitest
         run: bun run test
-      - name: Build
-        run: bun run build
