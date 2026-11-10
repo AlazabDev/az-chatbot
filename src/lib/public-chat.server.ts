@@ -148,6 +148,16 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   if (metricError) console.warn(JSON.stringify({
     event: "public_chat_usage_store_failed", requestId, code: metricError.code,
   }));
+  const { error: historyError } = await supabaseAdmin.rpc("append_guest_chat_turn", {
+    p_visitor_id: visitorId,
+    p_agent_id: agent.id,
+    p_thread_token: signConversation(conversationId, agent.id, visitorScope),
+    p_message: data.message,
+    p_reply: reply,
+  });
+  if (historyError) console.warn(JSON.stringify({
+    event: "public_chat_history_failed", requestId, code: historyError.code,
+  }));
   console.info(JSON.stringify({
     event: "public_chat_completed", requestId, agentId: agent.id, latencyMs,
     inputTokens, outputTokens, estimatedUsd, reserveUsd,
