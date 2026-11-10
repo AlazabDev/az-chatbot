@@ -43,6 +43,7 @@ export interface PublicChatInput {
   message: string;
   attachments?: Array<{ url: string; name: string; type: string }>;
   images?: Array<{ dataUrl: string }>;
+  documents?: Array<{ name: string; dataUrl: string }>;
 }
 
 export interface PublicChatResult {
@@ -58,6 +59,7 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   const started = Date.now();
   if (data.attachments?.length) throw new Error("ATTACHMENTS_REQUIRE_AUTH");
   if ((data.images?.length || 0) > 2) throw new Error("TOO_MANY_IMAGES");
+  if ((data.documents?.length || 0) > 1) throw new Error("TOO_MANY_DOCUMENTS");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: agent, error } = await supabaseAdmin.from("bot_agents")
     .select("id,agent_name,agent_version,is_active")
@@ -74,9 +76,10 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     throw new Error("CHAT_COST_NOT_CONFIGURED");
   }
   const imageCount = data.images?.length ?? 0;
+  const pdfCount = data.documents?.length ?? 0;
   // Conservative reservation. It is never returned to the daily pool even on failure.
-  const reserveUsd = Number(Math.max(0.25,
-    ((16000 + imageCount * 9000) * inputRate + 1024 * outputRate) / 1_000_000).toFixed(6));
+  const reserveUsd = Number(Math.max(pdfCount ? 1 : 0.25,
+    ((16000 + imageCount * 9000 + pdfCount * 50000) * inputRate + 1024 * outputRate) / 1_000_000).toFixed(6));
   await enforceGuestLimit(visitorId, data.agentId);
   const { data: reserved, error: reservationError } = await supabaseAdmin.rpc(
     "reserve_guest_chat_budget", {
@@ -104,6 +107,16 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     const match = /^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+={0,2})$/.exec(item.dataUrl);
     if (!match || match[2].length > 1_400_000) throw new Error("INVALID_IMAGE");
     inputContent.push({ type: "input_image", image_url: item.dataUrl });
+  }
+  for (const doc of data.documents ?? []) {
+    const matched = /^data:application\/pdf;base64,([a-zA-Z0-9+/]+={0,2})$/.exec(doc.dataUrl);
+    if (!matched || matched[1].length > 350_000 ||
+        !Buffer.from(matched[1], "base64").subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+      throw new Error("INVALID_GUEST_PDF");
+    }
+    const safeName = doc.name.replace(/[\\/]/g, "_").slice(0, 120);
+    if (!/\.pdf$/i.test(safeName)) throw new Error("INVALID_GUEST_PDF");
+    inputContent.push({ type: "input_file", filename: safeName, file_data: doc.dataUrl });
   }
   const response = await foundryRequest<{
     output_text?: string;
