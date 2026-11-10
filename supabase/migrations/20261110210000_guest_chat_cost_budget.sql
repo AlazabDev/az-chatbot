@@ -30,7 +30,7 @@ BEGIN
     OR p_reserve_usd <= 0 OR p_daily_limit_usd <= 0
     OR p_reserve_usd > 25 OR p_daily_limit_usd > 500 THEN RETURN false; END IF;
  INSERT INTO public.chat_gateway_budget AS b (day,reserved_usd,updated_at)
- VALUES (d,p_reserve_usd,now())
+ SELECT d,p_reserve_usd,now() WHERE p_reserve_usd <= p_daily_limit_usd
  ON CONFLICT (day) DO UPDATE
  SET reserved_usd=b.reserved_usd+EXCLUDED.reserved_usd,updated_at=now()
  WHERE b.reserved_usd + EXCLUDED.reserved_usd <= p_daily_limit_usd
