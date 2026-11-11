@@ -14,8 +14,23 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+type WaWebhookMedia = { id?: string; mime_type?: string; filename?: string };
+type WaWebhookMessage = {
+  id: string; from: string; type: string; timestamp: string;
+  text?: { body?: string }; button?: { text?: string };
+  interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
+  image?: WaWebhookMedia; video?: WaWebhookMedia; audio?: WaWebhookMedia;
+  document?: WaWebhookMedia;
+};
+type WaWebhookValue = {
+  metadata?: { phone_number_id?: string; display_phone_number?: string };
+  statuses?: Array<{ id: string; timestamp: string; status: string; errors?: unknown }>;
+  contacts?: Array<{ wa_id: string; profile?: { name?: string } }>;
+  messages?: WaWebhookMessage[];
+};
+type WaWebhookBody = { entry?: Array<{ changes?: Array<{ value?: WaWebhookValue }> }> };
 function background(promise: Promise<unknown>) {
-  const runtime = (globalThis as any).EdgeRuntime;
+  const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
   if (runtime?.waitUntil) runtime.waitUntil(promise);
   else void promise.catch((e) => console.error("background task failed", e));
 }
@@ -269,9 +284,9 @@ Deno.serve(async (req) => {
     return new Response("Invalid signature", { status: 401 });
   }
 
-  let body: any;
+  let body: WaWebhookBody;
   try {
-    body = JSON.parse(rawBody);
+    body = JSON.parse(rawBody) as WaWebhookBody;
   } catch {
     return new Response("Invalid JSON", { status: 400 });
   }
@@ -344,7 +359,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (existing.data) continue;
 
-        const profileName = contactsMeta.find((c: any) => c.wa_id === fromWaId)?.profile?.name;
+        const profileName = contactsMeta.find((c: { wa_id: string; profile?: { name?: string } }) => c.wa_id === fromWaId)?.profile?.name;
         const contactId = await upsertContact(tenantId, fromWaId, profileName);
         const conversationId = await getOrCreateConversation(tenantId, waNum.id, contactId);
         const text =
@@ -403,7 +418,7 @@ Deno.serve(async (req) => {
           processed_at: new Date().toISOString(),
         });
 
-        const isFinance = (waNum.meta as any)?.purpose === "finance";
+        const isFinance = (waNum.meta as { purpose?: string } | null)?.purpose === "finance";
         if (isFinance && mediaId && ["image", "document"].includes(msg.type)) {
           await queueFinanceDocument({
             tenantId,
