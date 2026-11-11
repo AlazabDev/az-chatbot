@@ -11,7 +11,8 @@ BASE=$ROOT/.deploy
 RELEASES=$BASE/releases
 CURRENT=$BASE/current
 PREVIOUS=$BASE/previous
-MODE=$1
+MODE=deploy
+if (($#)); then MODE=$1; fi
 WORKTREE=""
 PROBE=""
 OLD=""
@@ -112,8 +113,9 @@ cp -a "$WORKTREE/.output/." "$NEW/"
 valid "$NEW" || die 'Invalid release'
 git -C "$ROOT" worktree remove --force "$WORKTREE"
 WORKTREE=""
-PROBE=$NAME-probe-$SHORT
-pm2 describe "$PROBE" >/dev/null 2>&1 && die 'Probe process already exists'
+PROBE_CANDIDATE=$NAME-probe-$SHORT
+pm2 describe "$PROBE_CANDIDATE" >/dev/null 2>&1 && die 'Probe process already exists'
+PROBE=$PROBE_CANDIDATE
 start_app "$PROBE" "$NEW" "$TEST_PORT"
 if ! health "$TEST_PORT"; then
   pm2 logs "$PROBE" --lines 50 --nostream >&2 || true
