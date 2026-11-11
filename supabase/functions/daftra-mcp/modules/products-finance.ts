@@ -1,6 +1,21 @@
 // modules/products-finance.ts
 import { callDaftraApi } from "../daftra-client.ts";
 
+/** Typed arguments from this module's Daftra tool input schemas. */
+type ToolArgs = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  invoice_id?: number;
+  client_id?: number;
+  confirm?: boolean;
+  amount?: number;
+  payment_method?: string;
+  date?: string;
+  notes?: string;
+};
+
+
 export const productsFinanceTools = [
   {
     name: "daftra_list_products",
@@ -13,7 +28,7 @@ export const productsFinanceTools = [
         search: { type: "string", description: "بحث بالاسم أو الباركود أو كود المنتج SKU" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "product", undefined, {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -32,7 +47,7 @@ export const productsFinanceTools = [
         page: { type: "number", description: "رقم الصفحة" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "payment", undefined, {
         "filter[invoice_id]": args.invoice_id,
         "filter[client_id]": args.client_id,
@@ -55,7 +70,7 @@ export const productsFinanceTools = [
       },
       required: ["invoice_id", "amount", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("تسجيل دفعة محاسبية يتطلب تأكيداً بتمرير confirm=true.");
       }
