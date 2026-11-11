@@ -17,7 +17,7 @@ type ToolArgs = {
   journal_cat_id?: number;
   name?: string;
   code?: string;
-  type?: string;
+  type?: number | string;
   treasury_id?: number;
   client_id?: number;
   supplier_id?: number;
