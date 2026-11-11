@@ -49,7 +49,12 @@ Deno.serve(async (req) => {
   const userId = claims?.claims?.sub;
   if (!userId) return json({ error: "Unauthorized" }, 401);
 
-  let body: { tenant_id?: string; batch_id?: string | null; files?: Array<{ name: string; data?: string; mime?: string }>; [key: string]: unknown };
+  let body: {
+    tenant_id?: string; batch_id?: string | null; batch_name?: string; source_phone?: string;
+    files?: Array<{ file_name?: string; data_base64?: string; mime?: string }>;
+    media_wa_ids?: string[];
+    storage_import?: { prefix?: string; offset?: number; limit?: number };
+  };
   try {
     body = await req.json();
   } catch {
