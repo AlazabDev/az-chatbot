@@ -35,12 +35,12 @@ export async function analyzeImage(
   }
 
   const blocks = json?.readResult?.blocks ?? [];
-  const ocrText = blocks.flatMap((b: any) => (b.lines ?? []).map((l: any) => l.text)).join("\n");
+  const ocrText = blocks.flatMap((b: { lines?: Array<{ text?: string }> }) => (b.lines ?? []).map((l: { text?: string }) => l.text)).join("\n");
 
   return {
     ocrText,
     caption: json?.captionResult?.text,
-    tags: (json?.tagsResult?.values ?? []).map((t: any) => t.name),
+    tags: (json?.tagsResult?.values ?? []).map((t: { name?: string }) => t.name),
     raw: json,
   };
 }
