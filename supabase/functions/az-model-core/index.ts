@@ -17,7 +17,7 @@ export interface ChatMessage {
 export interface ChatRequestPayload {
   message: string;
   history?: ChatMessage[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 function jsonResponse(data: unknown, status = 200) {
@@ -82,7 +82,7 @@ export async function handleAgentRequest(req: Request, agent: AgentConfig) {
     ];
 
     const url = `${endpoint.replace(/\/+$/, "")}/openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`;
-    const bodyPayload: Record<string, any> = {
+    const bodyPayload: Record<string, unknown> = {
       messages,
       temperature: agent.temperature ?? 0.3,
     };
