@@ -1,0 +1,48 @@
+name: Edge Typecheck (Deno)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/edge-deno-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deno-types:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Typecheck modified Edge entrypoints and MCP modules
+        run: |
+          deno check --no-config \
+            supabase/functions/_shared/foundry.ts \
+            supabase/functions/_shared/openai.ts \
+            supabase/functions/_shared/vision.ts \
+            supabase/functions/ai_image_analyze/architectural_analyzer.ts \
+            supabase/functions/ai_image_analyze/gemini.client.ts \
+            supabase/functions/az-model-core/index.ts \
+            supabase/functions/cloudinary_ops/index.ts \
+            supabase/functions/daftra-mcp/modules/clients.ts \
+            supabase/functions/daftra-mcp/modules/finance.ts \
+            supabase/functions/daftra-mcp/modules/invoices.ts \
+            supabase/functions/daftra-mcp/modules/products-finance.ts \
+            supabase/functions/daftra-mcp/modules/work-orders.ts \
+            supabase/functions/finance-ingest/index.ts \
+            supabase/functions/finance-worker/index.ts \
+            supabase/functions/media_sync_wa/index.ts \
+            supabase/functions/meta_sync_all/index.ts \
+            supabase/functions/send_message/index.ts \
+            supabase/functions/templates_sync/index.ts \
+            supabase/functions/wa-send/index.ts \
+            supabase/functions/wa-webhook/index.ts \
+            supabase/functions/wa_webhook_inbound/index.ts \
+            supabase/functions/whatsapp-templates/index.ts \
+            supabase/functions/worker_dispatch/index.ts
