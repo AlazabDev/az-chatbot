@@ -57,6 +57,7 @@ export async function sendChatMessage({
 }: SendMessageArgs): Promise<ChatApiResponse> {
   const attachments: UploadedAttachment[] = [];
   const images: Array<{ dataUrl: string }> = [];
+  const documents: Array<{ name: string; dataUrl: string }> = [];
   const inlineImages = files.length > 0 && files.every((file) =>
     ["image/jpeg", "image/png", "image/webp"].includes(file.type)
   );
@@ -70,6 +71,15 @@ export async function sendChatMessage({
       });
       images.push({ dataUrl });
     }
+  } else if (files.length === 1 && files[0].type === "application/pdf" && files[0].size <= 256_000) {
+    const file = files[0];
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("تعذر قراءة ملف PDF."));
+      reader.readAsDataURL(file);
+    });
+    documents.push({ name: file.name, dataUrl });
   } else if (files.length > 0) {
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
@@ -113,7 +123,7 @@ export async function sendChatMessage({
   const visitorId = getChatVisitorId();
 
   const result = await foundryAgentChat({
-    data: { agentId: selected.id, visitorId, threadId, message, attachments: [], images },
+    data: { agentId: selected.id, visitorId, threadId, message, attachments: [], images, documents },
   });
   return {
     reply: result.reply,

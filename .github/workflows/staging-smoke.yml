@@ -21,6 +21,19 @@ jobs:
             https://*) ;;
             *) echo "Staging URL must use HTTPS"; exit 1 ;;
           esac
+      - name: Refuse production URL for staging testing
+        run: |
+          case "$STAGING_URL" in
+            https://chatbot.alazab.com|https://chatbot.alazab.com/)
+              echo "Use a separate staging origin, not the production domain"; exit 1 ;;
+          esac
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.3'
+      - run: bun install --frozen-lockfile
+      - run: bun add --no-save @playwright/test@1.56.1
+      - run: bunx playwright install --with-deps chromium
       - name: Public landing
         run: curl --fail --silent --show-error --location --retry 2 --max-time 25 "$STAGING_URL/"
       - name: Help portal
@@ -31,3 +44,7 @@ jobs:
         run: |
           response="$(curl --fail --silent --show-error --retry 2 --max-time 25 "$STAGING_URL/api/health")"
           echo "$response" | grep -q '"status":"ok"' || { echo "Readiness check failed"; exit 1; }
+      - name: Real browser staging guest and API isolation
+        env:
+          CHATBOT_E2E_URL: ${{ secrets.CHATBOT_STAGING_URL }}
+        run: bunx playwright test

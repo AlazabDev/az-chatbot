@@ -9,10 +9,14 @@ const mocks = vi.hoisted(() => ({
   foundryChat: vi.fn(),
   getUser: vi.fn(),
   upload: vi.fn(),
+  guestHistory: vi.fn(),
 }));
 
 vi.mock("@/lib/agents/dispatcher.functions", () => ({
   listPublicAgents: mocks.listAgents,
+}));
+vi.mock("@/lib/guestHistory.functions", () => ({
+  getGuestHistory: mocks.guestHistory,
 }));
 vi.mock("@/lib/foundry-live.functions", () => ({
   foundryAgentChat: mocks.foundryAgentChat,
@@ -41,6 +45,12 @@ beforeEach(() => {
     { id: AGENT_B, slug: "project", name: "Project", description: "", isDefault: false },
   ]);
   mocks.foundryAgentChat.mockResolvedValue({ reply: "أهلاً", threadId: "conv.sig" });
+  mocks.guestHistory.mockImplementation(async ({ data }: { data: { agentId: string } }) =>
+    data.agentId === AGENT_B
+      ? { messages: [], conversationId: "" }
+      : { messages: [{ id: "server-one", role: "user", content: "Private A", timestamp: 1 }],
+          conversationId: "thread-a.sig" });
+
 });
 
 describe("public guest chat", () => {
@@ -94,22 +104,23 @@ describe("public guest chat", () => {
     expect(mocks.foundryAgentChat).not.toHaveBeenCalled();
   });
 
-  it("keeps histories and thread tokens separate between agents", async () => {
+  it("restores histories only from the signed-cookie server endpoint per agent", async () => {
+    // A shared device may still have old localStorage data from a different guest.
+    window.localStorage.setItem("azab.chat.agent.az-agent-azabot.messages",
+      JSON.stringify([{ id: "stolen", role: "user", content: "Other visitor", timestamp: 1 }]));
     const { result } = renderHook(() => useChatSession());
     await waitFor(() => expect(result.current.hydrated).toBe(true));
-    act(() => {
-      result.current.setMessages([{ id: "one", role: "user", content: "Private A", timestamp: 1 }]);
-      result.current.setConversationId("thread-a.sig");
-    });
-    await waitFor(() => expect(window.localStorage.getItem("azab.chat.agent." + encodeURIComponent(result.current.selectedAgentId) + ".messages")).toContain("Private A"));
-    const firstAgent = result.current.selectedAgentId;
+    expect(result.current.messages[0]?.content).toBe("Private A");
+    expect(result.current.messages.map((m) => m.content)).not.toContain("Other visitor");
+    const first = result.current.selectedAgentId;
     act(() => result.current.setSelectedAgentId(AGENT_B));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     expect(result.current.messages).toEqual([]);
     expect(result.current.conversationId).toBe("");
-    act(() => result.current.setSelectedAgentId(firstAgent));
+    act(() => result.current.setSelectedAgentId(first));
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     expect(result.current.messages[0]?.content).toBe("Private A");
     expect(result.current.conversationId).toBe("thread-a.sig");
+    expect(mocks.guestHistory).toHaveBeenCalledWith({ data: { agentId: first } });
   });
 });

@@ -22,11 +22,19 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Build and regenerate TanStack route tree
         run: bun run build
+      - name: Archive immutable build for rollback
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatbot-build-${{ github.sha }}
+          path: .output/
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: error
       - name: TypeScript
         run: bunx tsc --noEmit
       - name: ESLint (changed application paths)
         run: |
-          bunx eslint src/lib/public-chat.server.ts src/lib/foundry-live.functions.ts src/lib/chatApi.ts src/lib/chatAnalytics.functions.ts src/routes/admin.analytics.tsx 'src/routes/api/public/agents.$slug.ts' src/routes/api/health.ts src/test/guest-chat.test.ts --rule 'prettier/prettier: off'
+          bunx eslint src/lib/public-chat.server.ts src/lib/guestSession.server.ts src/lib/guestHistory.functions.ts src/lib/foundry-live.functions.ts src/lib/chatApi.ts src/lib/chatAnalytics.functions.ts src/routes/admin.analytics.tsx 'src/routes/api/public/agents.$slug.ts' src/routes/api/health.ts src/test/guest-chat.test.ts src/test/guestSession.test.ts src/test/publicGatewaySecurity.test.ts --rule 'prettier/prettier: off'
       - name: Legacy repository lint audit (non-blocking)
         continue-on-error: true
         run: bun run lint

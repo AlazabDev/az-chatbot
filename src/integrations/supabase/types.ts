@@ -486,6 +486,51 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_gateway_alerts: {
+        Row: {
+          code: string
+          created_at: string
+          day: string
+          severity: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          day: string
+          severity: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          day?: string
+          severity?: string
+        }
+        Relationships: []
+      }
+      chat_gateway_budget: {
+        Row: {
+          daily_limit_usd: number
+          day: string
+          observed_usd: number
+          reserved_usd: number
+          updated_at: string
+        }
+        Insert: {
+          daily_limit_usd?: number
+          day: string
+          observed_usd?: number
+          reserved_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          daily_limit_usd?: number
+          day?: string
+          observed_usd?: number
+          reserved_usd?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_gateway_quota: {
         Row: {
           bucket_key: string
@@ -503,6 +548,41 @@ export type Database = {
           window_start?: string
         }
         Relationships: []
+      }
+      chat_gateway_reservations: {
+        Row: {
+          actual_usd: number | null
+          created_at: string
+          day: string
+          finalized_at: string | null
+          request_id: string
+          reserved_usd: number
+        }
+        Insert: {
+          actual_usd?: number | null
+          created_at?: string
+          day: string
+          finalized_at?: string | null
+          request_id: string
+          reserved_usd: number
+        }
+        Update: {
+          actual_usd?: number | null
+          created_at?: string
+          day?: string
+          finalized_at?: string | null
+          request_id?: string
+          reserved_usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_gateway_reservations_day_fkey"
+            columns: ["day"]
+            isOneToOne: false
+            referencedRelation: "chat_gateway_budget"
+            referencedColumns: ["day"]
+          },
+        ]
       }
       chat_gateway_usage: {
         Row: {
@@ -538,6 +618,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "chat_gateway_usage_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "bot_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_guest_state: {
+        Row: {
+          agent_id: string
+          messages: Json
+          thread_token: string
+          updated_at: string
+          visitor_id: string
+        }
+        Insert: {
+          agent_id: string
+          messages?: Json
+          thread_token?: string
+          updated_at?: string
+          visitor_id: string
+        }
+        Update: {
+          agent_id?: string
+          messages?: Json
+          thread_token?: string
+          updated_at?: string
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_guest_state_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "bot_agents"
@@ -2085,6 +2197,16 @@ export type Database = {
       }
     }
     Functions: {
+      append_guest_chat_turn: {
+        Args: {
+          p_agent_id: string
+          p_message: string
+          p_reply: string
+          p_thread_token: string
+          p_visitor_id: string
+        }
+        Returns: undefined
+      }
       bot_begin_chat_request: {
         Args: {
           p_agent_id: string
@@ -2118,6 +2240,11 @@ export type Database = {
         Args: { p_agent_id: string; p_ip_hash: string; p_visitor_id: string }
         Returns: boolean
       }
+      finalize_guest_chat_budget: {
+        Args: { p_actual_usd: number; p_request_id: string }
+        Returns: boolean
+      }
+      get_chat_gateway_budget_status: { Args: never; Returns: Json }
       get_daily_message_counts: {
         Args: { days?: number }
         Returns: {
@@ -2142,6 +2269,14 @@ export type Database = {
         Returns: boolean
       }
       next_maintenance_request_number: { Args: never; Returns: string }
+      reserve_guest_chat_budget: {
+        Args: {
+          p_daily_limit_usd: number
+          p_request_id: string
+          p_reserve_usd: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:

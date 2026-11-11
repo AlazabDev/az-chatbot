@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ChatMessage, ChatSettingsState } from "@/types/chat";
 import { listPublicAgents } from "@/lib/agents/dispatcher.functions";
 import { getChatStorage, setChatStorage, getChatVisitorId } from "@/lib/chatStorage";
+import { getGuestHistory } from "@/lib/guestHistory.functions";
 
 const PREFIX = "azab.chat";
 const LS_SETTINGS = `${PREFIX}.settings`;
@@ -69,26 +70,26 @@ export function useChatSession({ applyTheme = true }: Options = {}) {
     return () => { active = false; };
   }, []);
 
-  // Load each agent's own conversation before permitting persistence for that agent.
+  // Server-owned history is scoped to a signed HttpOnly cookie.
+  // Ignore localStorage transcripts from other visitors on a shared browser.
   useEffect(() => {
     if (!hydrated) return;
+    let active = true;
     setLoadedAgentId(null);
-    setMessages(loadMessages(selectedAgentId));
-    const scopedConversation = read(sessionKey(selectedAgentId, "conversationId"));
-    setConversationId(scopedConversation ?? (read(LS_AGENT_ID) === selectedAgentId ? read(`${PREFIX}.conversationId`) : null) ?? "");
-    setLoadedAgentId(selectedAgentId);
+    setMessages([]);
+    setConversationId("");
     write(LS_AGENT_ID, selectedAgentId);
+    void getGuestHistory({ data: { agentId: selectedAgentId } })
+      .then(({ messages: restored, conversationId: thread }) => {
+        if (!active) return;
+        setMessages(restored);
+        setConversationId(thread);
+        setLoadedAgentId(selectedAgentId);
+      }).catch(() => {
+        if (active) setLoadedAgentId(selectedAgentId);
+      });
+    return () => { active = false; };
   }, [selectedAgentId, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated || loadedAgentId !== selectedAgentId) return;
-    write(sessionKey(selectedAgentId, "messages"), JSON.stringify(messages.slice(-200)));
-  }, [messages, selectedAgentId, loadedAgentId, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated || loadedAgentId !== selectedAgentId) return;
-    write(sessionKey(selectedAgentId, "conversationId"), conversationId);
-  }, [conversationId, selectedAgentId, loadedAgentId, hydrated]);
 
   useEffect(() => {
     if (hydrated) write(LS_SETTINGS, JSON.stringify(settings));

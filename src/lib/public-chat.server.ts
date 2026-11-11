@@ -2,6 +2,7 @@ import { signConversation, verifyConversation } from "@/lib/threadTokens.server"
 import { getRequest } from "@tanstack/react-start/server";
 import { createHmac } from "node:crypto";
 import { foundryRequest } from "@/lib/foundry-transport.server";
+import { requireGuestIdentity } from "@/lib/guestSession.server";
 
 /**
  * Resolve an address only from a header explicitly trusted by deployment configuration.
@@ -36,11 +37,13 @@ async function enforceGuestLimit(visitorId: string, agentId: string): Promise<vo
 
 export interface PublicChatInput {
   agentId: string;
-  visitorId: string;
+  /** Legacy client hint only: the server uses its signed HttpOnly visitor cookie. */
+  visitorId?: string;
   threadId?: string | null;
   message: string;
   attachments?: Array<{ url: string; name: string; type: string }>;
   images?: Array<{ dataUrl: string }>;
+  documents?: Array<{ name: string; dataUrl: string }>;
 }
 
 export interface PublicChatResult {
@@ -52,10 +55,14 @@ export interface PublicChatResult {
 }
 
 export async function executePublicChat(data: PublicChatInput): Promise<PublicChatResult> {
+  const incoming = getRequest();
+  const origin = incoming.headers.get("origin");
+  if (origin && origin !== new URL(incoming.url).origin) throw new Error("FORBIDDEN_ORIGIN");
   const requestId = crypto.randomUUID();
   const started = Date.now();
   if (data.attachments?.length) throw new Error("ATTACHMENTS_REQUIRE_AUTH");
   if ((data.images?.length || 0) > 2) throw new Error("TOO_MANY_IMAGES");
+  if ((data.documents?.length || 0) > 1) throw new Error("TOO_MANY_DOCUMENTS");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: agent, error } = await supabaseAdmin.from("bot_agents")
     .select("id,agent_name,agent_version,is_active")
@@ -63,9 +70,32 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     .eq("is_active", true).eq("public_access", true).maybeSingle();
   if (error || !agent?.agent_name) throw new Error("AGENT_UNAVAILABLE");
 
-  // Only explicitly public agents can incur costs; quota is checked afterwards.
-  await enforceGuestLimit(data.visitorId, data.agentId);
-  const visitorScope = `guest:${data.visitorId}`;
+  const visitorId = requireGuestIdentity();
+  // Fail closed if prices have not been set for the actual Foundry model.
+  const inputRate = Number(process.env.FOUNDRY_INPUT_COST_PER_1M_TOKENS);
+  const outputRate = Number(process.env.FOUNDRY_OUTPUT_COST_PER_1M_TOKENS);
+  const dailyLimit = Number(process.env.CHAT_DAILY_BUDGET_USD || "5");
+  if (!(inputRate > 0 && outputRate > 0 && dailyLimit > 0)) {
+    throw new Error("CHAT_COST_NOT_CONFIGURED");
+  }
+  const imageCount = data.images?.length ?? 0;
+  const pdfCount = data.documents?.length ?? 0;
+  // Conservative reservation. It is never returned to the daily pool even on failure.
+  const reserveUsd = Number(Math.max(pdfCount ? 1 : 0.25,
+    ((16000 + imageCount * 9000 + pdfCount * 50000) * inputRate + 1024 * outputRate) / 1_000_000).toFixed(6));
+  await enforceGuestLimit(visitorId, data.agentId);
+  const { data: reserved, error: reservationError } = await supabaseAdmin.rpc(
+    "reserve_guest_chat_budget", {
+      p_request_id: requestId,
+      p_reserve_usd: reserveUsd,
+      p_daily_limit_usd: dailyLimit,
+    });
+  if (reservationError) {
+    console.error("[chat-gateway] budget database unavailable", reservationError.code);
+    throw new Error("CHAT_BUDGET_UNAVAILABLE");
+  }
+  if (!reserved) throw new Error("CHAT_DAILY_BUDGET_EXCEEDED");
+  const visitorScope = `guest:${visitorId}`;
   const conversation = verifyConversation(data.threadId, agent.id, visitorScope);
   const created = conversation ? null : await foundryRequest<{ id: string }>("/openai/v1/conversations", {
     method: "POST", body: JSON.stringify({}),
@@ -81,6 +111,16 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     if (!match || match[2].length > 1_400_000) throw new Error("INVALID_IMAGE");
     inputContent.push({ type: "input_image", image_url: item.dataUrl });
   }
+  for (const doc of data.documents ?? []) {
+    const matched = /^data:application\/pdf;base64,([a-zA-Z0-9+/]+={0,2})$/.exec(doc.dataUrl);
+    if (!matched || matched[1].length > 350_000 ||
+        !Buffer.from(matched[1], "base64").subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+      throw new Error("INVALID_GUEST_PDF");
+    }
+    const safeName = doc.name.replace(/[\\/]/g, "_").slice(0, 120);
+    if (!/\.pdf$/i.test(safeName)) throw new Error("INVALID_GUEST_PDF");
+    inputContent.push({ type: "input_file", filename: safeName, file_data: doc.dataUrl });
+  }
   const response = await foundryRequest<{
     output_text?: string;
     usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
@@ -89,6 +129,7 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
     method: "POST",
     body: JSON.stringify({
       conversation: conversationId,
+      max_output_tokens: 1024,
       input: [{ type: "message", role: "user", content: inputContent }],
     }),
   });
@@ -101,12 +142,16 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   const latencyMs = Date.now() - started;
   const inputTokens = response.usage?.input_tokens ?? null;
   const outputTokens = response.usage?.output_tokens ?? null;
-  const inputRate = Number(process.env.FOUNDRY_INPUT_COST_PER_1M_TOKENS || "0");
-  const outputRate = Number(process.env.FOUNDRY_OUTPUT_COST_PER_1M_TOKENS || "0");
   const estimatedUsd = inputTokens !== null && outputTokens !== null &&
     Number.isFinite(inputRate) && Number.isFinite(outputRate)
     ? Number(((inputTokens * inputRate + outputTokens * outputRate) / 1_000_000).toFixed(6))
     : null;
+  if (estimatedUsd !== null) {
+    const { error: finalizationError } = await supabaseAdmin.rpc("finalize_guest_chat_budget", {
+      p_request_id: requestId, p_actual_usd: estimatedUsd,
+    });
+    if (finalizationError) console.error("[chat-gateway] budget reconciliation failed", finalizationError.code);
+  }
   const { error: metricError } = await supabaseAdmin.from("chat_gateway_usage").insert({
     request_id: requestId,
     agent_id: agent.id,
@@ -119,9 +164,19 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   if (metricError) console.warn(JSON.stringify({
     event: "public_chat_usage_store_failed", requestId, code: metricError.code,
   }));
+  const { error: historyError } = await supabaseAdmin.rpc("append_guest_chat_turn", {
+    p_visitor_id: visitorId,
+    p_agent_id: agent.id,
+    p_thread_token: signConversation(conversationId, agent.id, visitorScope),
+    p_message: data.message,
+    p_reply: reply,
+  });
+  if (historyError) console.warn(JSON.stringify({
+    event: "public_chat_history_failed", requestId, code: historyError.code,
+  }));
   console.info(JSON.stringify({
     event: "public_chat_completed", requestId, agentId: agent.id, latencyMs,
-    inputTokens, outputTokens, estimatedUsd,
+    inputTokens, outputTokens, estimatedUsd, reserveUsd,
     messageChars: data.message.length, replyChars: reply.length,
   }));
   return {

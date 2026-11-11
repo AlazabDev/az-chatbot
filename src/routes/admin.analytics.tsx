@@ -45,6 +45,27 @@ function AdminAnalyticsPage() {
               <Metric label="التكلفة التقديرية (USD)" value={stats.estimatedCostUsdSampled.toFixed(4)} />
               <Metric label="زمن الاستجابة P95 (ms)" value={stats.p95LatencyMsSampled.toLocaleString("ar-EG")} />
             </div>
+            <div className="rounded-lg border p-3 space-y-2">
+              <h3 className="font-semibold">ميزانية Foundry اليومية المحجوزة</h3>
+              <p className="text-sm">
+                {stats.budget.reservedUsd.toFixed(4)} / {stats.budget.dailyLimitUsd.toFixed(2)} USD
+                {" — "}
+                {stats.budget.usedPercent}%
+              </p>
+              <progress className="w-full" max={100} value={Math.min(100, stats.budget.usedPercent)} />
+              <p className="text-xs text-muted-foreground">
+                الاستهلاك المرصود: {stats.budget.observedUsd.toFixed(4)} USD.
+                الحجز احترازي ولا يمثل فاتورة Azure النهائية.
+              </p>
+              {stats.budget.alerts.map((alert) => (
+                <p key={alert.code} role="alert"
+                  className={alert.severity === "critical" ? "text-red-700 font-medium" : "text-amber-700"}>
+                  {alert.code === "daily_budget_80_percent" ? "تحذير: تجاوز 80% من الميزانية اليومية"
+                    : alert.code === "daily_budget_exhausted" ? "حرج: تم بلوغ الميزانية اليومية"
+                      : alert.code}
+                </p>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground">
               الرموز والتكلفة وزمن الاستجابة محسوبة من أحدث {stats.sampledRequests} طلب ناجح بحد أقصى 1000 طلب، وليست بالضرورة إجمالي آخر سبعة أيام.
               تقدير التكلفة يتطلب ضبط أسعار الرموز على الخادم وعودة usage من Foundry.

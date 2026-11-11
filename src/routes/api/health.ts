@@ -12,6 +12,16 @@ export const Route = createFileRoute("/api/health")({
             .select("id", { head: true, count: "exact" })
             .eq("is_active", true).eq("public_access", true);
           if (error) throw new Error("database_unavailable");
+          const configured = [
+            "FOUNDRY_INPUT_COST_PER_1M_TOKENS",
+            "FOUNDRY_OUTPUT_COST_PER_1M_TOKENS",
+            "CHAT_DAILY_BUDGET_USD",
+          ].every((name) => Number(process.env[name]) > 0);
+          const signing = process.env.CHAT_GATEWAY_HASH_SECRET || process.env.THREAD_SIGNING_SECRET;
+          if (!configured || !signing || signing.length < 32)
+            throw new Error("chat_security_environment_unavailable");
+          const { error: budgetError } = await supabaseAdmin.rpc("get_chat_gateway_budget_status");
+          if (budgetError) throw new Error("chat_budget_store_unavailable");
           return Response.json({ status: "ok", service: "az-chatbot", requestId }, {
             status: 200,
             headers: { "Cache-Control": "no-store", "X-Request-ID": requestId },
