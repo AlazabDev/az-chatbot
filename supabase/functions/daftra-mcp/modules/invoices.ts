@@ -1,7 +1,7 @@
 // modules/invoices.ts
 import { callDaftraApi } from "../daftra-client.ts";
 
-type InvoiceLine = { item_id: number; item: number; unit_price: number; quantity: number; tax1: number };
+type InvoiceLine = { item_id?: number; item?: string; unit_price: number; quantity: number; tax1?: number };
 /** Typed arguments from this module's Daftra tool input schemas. */
 type ToolArgs = {
   page?: number;
