@@ -24,7 +24,7 @@ function toIsoFromWaTimestamp(ts?: string): string {
 }
 
 async function pickWaNumberForSender(
-  supabase: any,
+  supabase: ReturnType<typeof createClient>,
   waNumbers: Array<{ id: string; tenant_id: string; created_at?: string }>,
   senderPhone: string,
   preferredTenantId?: string,
