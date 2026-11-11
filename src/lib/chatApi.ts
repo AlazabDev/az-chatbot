@@ -71,19 +71,30 @@ export async function sendChatMessage({
       });
       images.push({ dataUrl });
     }
-  } else if (files.length === 1 && files[0].type === "application/pdf" && files[0].size <= 256_000) {
+  } else if (
+    files.length === 1 &&
+    files[0].size <= 256_000 &&
+    [
+      ["application/pdf", ".pdf"],
+      ["text/plain", ".txt"],
+      ["text/csv", ".csv"],
+      ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"],
+      ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"],
+    ].some(([mime, extension]) =>
+      files[0].type === mime && files[0].name.toLowerCase().endsWith(extension))
+  ) {
     const file = files[0];
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("تعذر قراءة ملف PDF."));
+      reader.onerror = () => reject(new Error("تعذر قراءة المرفق."));
       reader.readAsDataURL(file);
     });
     documents.push({ name: file.name, dataUrl });
   } else if (files.length > 0) {
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
-      throw new Error("الصور للزوار حتى 1MB للصورة (بحد أقصى صورتين). الملفات الأخرى تتطلب تسجيل الدخول.");
+      throw new Error("الصور للزوار حتى 1MB للصورة (بحد أقصى صورتين)، وملف PDF أو DOCX أو XLSX أو TXT أو CSV واحد حتى 256KB. الملفات الأخرى تتطلب تسجيل الدخول.");
     }
     const scope = crypto.randomUUID();
     for (const file of files) attachments.push(await uploadFile(file, scope, authData.user.id));
