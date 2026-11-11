@@ -55,6 +55,9 @@ export interface PublicChatResult {
 }
 
 export async function executePublicChat(data: PublicChatInput): Promise<PublicChatResult> {
+  const incoming = getRequest();
+  const origin = incoming.headers.get("origin");
+  if (origin && origin !== new URL(incoming.url).origin) throw new Error("FORBIDDEN_ORIGIN");
   const requestId = crypto.randomUUID();
   const started = Date.now();
   if (data.attachments?.length) throw new Error("ATTACHMENTS_REQUIRE_AUTH");
