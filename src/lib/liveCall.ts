@@ -58,12 +58,14 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
       return;
     }
     switch (evt.type) {
+      case "response.output_audio_transcript.delta":
       case "response.audio_transcript.delta":
       case "response.output_text.delta":
         assistantBuffer += evt.delta ?? "";
         callbacks.onCaption?.(assistantBuffer);
         callbacks.onSpeakingChange?.(true);
         break;
+      case "response.output_audio_transcript.done":
       case "response.audio_transcript.done":
       case "response.output_text.done":
         if (assistantBuffer.trim()) {
@@ -104,41 +106,29 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
     throw new Error("REALTIME_UNAVAILABLE");
   }
   await pc.setRemoteDescription({ type: "answer", sdp: response.sdpAnswer });
-  const callLimit = window.setTimeout(() => {
+  let callLimit: ReturnType<typeof setTimeout> | undefined;
+  const finish = (notify: boolean) => {
     if (closed) return;
     closed = true;
-    stream.getTracks().forEach((t) => t.stop());
-    channel.close();
-    pc.close();
+    if (callLimit !== undefined) clearTimeout(callLimit);
+    try {
+      stream.getTracks().forEach((track) => track.stop());
+      channel.close();
+      pc.close();
+    } catch { /* Already closed */ }
     audio.srcObject = null;
-    callbacks.onClosed?.();
-  }, response.maxDurationSeconds * 1000);
+    if (notify) callbacks.onClosed?.();
+  };
+  callLimit = window.setTimeout(() => finish(true), response.maxDurationSeconds * 1000);
 
   pc.onconnectionstatechange = () => {
+    if (closed) return;
     if (pc.connectionState === "connected") callbacks.onConnected?.();
-    if (
-      !closed &&
-      (pc.connectionState === "failed" ||
-        pc.connectionState === "closed" ||
-        pc.connectionState === "disconnected")
-    ) {
-      callbacks.onClosed?.();
-    }
+    if (["failed", "closed", "disconnected"].includes(pc.connectionState)) finish(true);
   };
 
   return {
-    stop: () => {
-      closed = true;
-      window.clearTimeout(callLimit);
-      try {
-        stream.getTracks().forEach((t) => t.stop());
-        channel.close();
-        pc.close();
-      } catch {
-        /* noop */
-      }
-      audio.srcObject = null;
-    },
+    stop: () => finish(false),
     setMuted: (muted: boolean) => {
       micTrack.enabled = !muted;
     },
