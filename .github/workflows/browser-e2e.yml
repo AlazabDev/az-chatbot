@@ -5,13 +5,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: guest-browser-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   browser:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
