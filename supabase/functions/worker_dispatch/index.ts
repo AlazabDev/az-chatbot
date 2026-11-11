@@ -150,7 +150,7 @@ type WorkerJob = {
 type WorkflowRunAction = { action: string; status: string; error?: string };
 type TemplateComponent = { type?: string; text?: string; example?: { body_text?: string[][] } };
 type OutboundWaPayload = {
-  messaging_product: "whatsapp"; to: string | undefined;
+  messaging_product: "whatsapp"; to: string;
   type?: "text" | "template";
   template?: WorkerPayload["template"];
   text?: { body: string };
@@ -538,14 +538,22 @@ async function processSendMessage(supabase: WorkerClient, job: WorkerJob) {
 
   const { data: conv } = await supabase
     .from("conversations")
-    .select("contact_id, wa_number_id, contacts(phone_e164), wa_numbers(phone_number_id)")
+    .select("contact_id, wa_number_id")
     .eq("id", conversation_id)
+    .eq("tenant_id", tenant_id)
     .single();
 
   if (!conv) throw new Error("Conversation not found");
-
-  const recipientPhone = conv.contacts?.phone_e164?.replace("+", "");
-  const phoneNumberId = conv.wa_numbers?.phone_number_id;
+  const { data: contact } = await supabase.from("contacts")
+    .select("phone_e164").eq("id", String(conv.contact_id))
+    .eq("tenant_id", tenant_id).maybeSingle();
+  const { data: number } = await supabase.from("wa_numbers")
+    .select("phone_number_id").eq("id", String(conv.wa_number_id))
+    .eq("tenant_id", tenant_id).maybeSingle();
+  const phone = (contact as { phone_e164?: string } | null)?.phone_e164;
+  const phoneNumberId = (number as { phone_number_id?: string } | null)?.phone_number_id;
+  if (!phone || !phoneNumberId) throw new Error("Conversation contact or WA number missing");
+  const recipientPhone = phone.replace("+", "");
 
   const waPayload: OutboundWaPayload = { messaging_product: "whatsapp", to: recipientPhone };
   if (template) {
