@@ -40,7 +40,7 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
   let closed = false;
   let stream: MediaStream | null = null;
   let channel: RTCDataChannel | null = null;
-  let callLimit: ReturnType<typeof setTimeout> | undefined;
+  let callLimit: number | undefined;
   const finish = (notify: boolean) => {
     if (closed) return;
     closed = true;
