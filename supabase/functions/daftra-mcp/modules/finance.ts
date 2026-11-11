@@ -2,7 +2,7 @@
 // موديول الحسابات العامة والمالية: القيود اليومية، دليل الحسابات، المصروفات، الإيرادات، والخزائن
 import { callDaftraApi } from "../daftra-client.ts";
 
-type JournalTransaction = { currency_debit: number; currency_credit: number; journal_account_id: number; description: number };
+type JournalTransaction = { journal_account_id: number; currency_debit?: number; currency_credit?: number; description?: string };
 /** Typed arguments from this module's Daftra tool input schemas. */
 type ToolArgs = {
   page?: number;
