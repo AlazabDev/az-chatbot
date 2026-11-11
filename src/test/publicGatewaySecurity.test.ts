@@ -7,6 +7,7 @@ const mocked = vi.hoisted(() => ({
   agent: vi.fn(),
   rpc: vi.fn(),
   insert: vi.fn(),
+  request: vi.fn(),
 }));
 vi.mock("@/lib/guestSession.server", () => ({
   requireGuestIdentity: mocked.identity,
@@ -33,7 +34,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
   },
 }));
 vi.mock("@tanstack/react-start/server", () => ({
-  getRequest: () => new Request("https://chatbot.example.com"),
+  getRequest: mocked.request,
 }));
 
 import { executePublicChat } from "@/lib/public-chat.server";
@@ -50,6 +51,7 @@ beforeEach(() => {
   vi.stubEnv("FOUNDRY_OUTPUT_COST_PER_1M_TOKENS", "10");
   vi.stubEnv("CHAT_DAILY_BUDGET_USD", "5");
   mocked.identity.mockReturnValue(a);
+  mocked.request.mockReturnValue(new Request("https://chatbot.example.com"));
   mocked.agent.mockResolvedValue({ data: {
     id: agentId, agent_name: "az-agent-azabot", agent_version: "1.0", is_active: true,
   }, error: null });
@@ -61,6 +63,16 @@ beforeEach(() => {
 });
 
 describe("public gateway security invariants", () => {
+  it("rejects cross-origin RPC requests before reading data or charging Foundry", async () => {
+    mocked.request.mockReturnValue(new Request("https://chatbot.example.com", {
+      method: "POST", headers: { Origin: "https://untrusted.example" },
+    }));
+    await expect(executePublicChat({ agentId, message: "Hello" }))
+      .rejects.toThrow("FORBIDDEN_ORIGIN");
+    expect(mocked.agent).not.toHaveBeenCalled();
+    expect(mocked.foundry).not.toHaveBeenCalled();
+  });
+
   it("denies non-public agents before consuming any quotas or Foundry calls", async () => {
     mocked.agent.mockResolvedValueOnce({ data: null, error: null });
     await expect(executePublicChat({ agentId, visitorId: b, message: "Hello" }))
