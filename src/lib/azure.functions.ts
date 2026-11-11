@@ -53,7 +53,12 @@ export const callAzureOpenAI = createServerFn({ method: "POST" })
   .inputValidator((data: AzureRequestData) => data)
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { endpoint, apiKey, deployment, apiVersion, temperature, maxTokens, messages } = data;
+    const { endpoint, apiKey, deployment, apiVersion, temperature, maxTokens } = data;
+    // Never trust client-supplied roles: only plain user turns are forwarded.
+    const messages = (Array.isArray(data.messages) ? data.messages : [])
+      .slice(-20)
+      .filter((m) => m && typeof m.content === "string")
+      .map((m) => ({ role: "user" as const, content: String(m.content).slice(0, 8000) }));
 
     if (!endpoint || !apiKey || !deployment) {
       throw new Error("الإعدادات غير مكتملة: endpoint و apiKey و deployment مطلوبة.");
