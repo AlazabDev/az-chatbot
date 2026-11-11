@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     if (!membership) return json({ error: "Forbidden" }, 403);
     if (membership.role === "viewer") return json({ error: "Forbidden: operator+ required" }, 403);
 
-    const records = files.map((f: any) => ({
+    const records = files.map((f: { public_id: string; resource_type: string; format?: string; mime?: string; bytes?: number; etag?: string }) => ({
       tenant_id,
       storage_key: f.public_id,
       storage_bucket: "cloudinary",
