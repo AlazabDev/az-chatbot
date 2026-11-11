@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { createHmac } from "node:crypto";
 import { foundryRequest } from "@/lib/foundry-transport.server";
 import { requireGuestIdentity } from "@/lib/guestSession.server";
+import { guestDocumentContent, guestImageContent } from "@/lib/guestMedia.server";
 
 /**
  * Resolve an address only from a header explicitly trusted by deployment configuration.
@@ -106,21 +107,8 @@ export async function executePublicChat(data: PublicChatInput): Promise<PublicCh
   const inputContent: Array<Record<string, unknown>> = [
     { type: "input_text", text: data.message || "يرجى تحليل الصورة المرفقة." },
   ];
-  for (const item of data.images ?? []) {
-    const match = /^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+={0,2})$/.exec(item.dataUrl);
-    if (!match || match[2].length > 1_400_000) throw new Error("INVALID_IMAGE");
-    inputContent.push({ type: "input_image", image_url: item.dataUrl });
-  }
-  for (const doc of data.documents ?? []) {
-    const matched = /^data:application\/pdf;base64,([a-zA-Z0-9+/]+={0,2})$/.exec(doc.dataUrl);
-    if (!matched || matched[1].length > 350_000 ||
-        !Buffer.from(matched[1], "base64").subarray(0, 5).equals(Buffer.from("%PDF-"))) {
-      throw new Error("INVALID_GUEST_PDF");
-    }
-    const safeName = doc.name.replace(/[\\/]/g, "_").slice(0, 120);
-    if (!/\.pdf$/i.test(safeName)) throw new Error("INVALID_GUEST_PDF");
-    inputContent.push({ type: "input_file", filename: safeName, file_data: doc.dataUrl });
-  }
+  for (const item of data.images ?? []) inputContent.push(guestImageContent(item));
+  for (const doc of data.documents ?? []) inputContent.push(guestDocumentContent(doc));
   const response = await foundryRequest<{
     output_text?: string;
     usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
