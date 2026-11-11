@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       tenant_id,
       storage_key: f.public_id,
       storage_bucket: "cloudinary",
-      kind: detectKind(f.resource_type, f.format),
+      kind: detectKind(f.resource_type, f.format ?? ""),
       mime: f.mime || `${f.resource_type}/${f.format}`,
       size_bytes: f.bytes || null,
       sha256: f.etag || null,
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     return json({ saved: data?.length || 0 });
   } catch (err) {
     console.error("cloudinary_ops error:", err);
-    return json({ error: err.message }, 500);
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
 
