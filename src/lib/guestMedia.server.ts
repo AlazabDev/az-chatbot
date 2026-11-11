@@ -22,6 +22,44 @@ function dataUri(raw: string, limit: number): { mime: string; bytes: Buffer } {
   return { mime: match[1].toLowerCase(), bytes };
 }
 
+/** Reject encrypted, oversized, malformed or unrelated ZIP containers. */
+function inspectOfficeZip(bytes: Buffer, requiredEntry: string): boolean {
+  const eocd = bytes.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (eocd < 0 || eocd + 22 > bytes.length) return false;
+  const entries = bytes.readUInt16LE(eocd + 10);
+  const centralSize = bytes.readUInt32LE(eocd + 12);
+  const offset = bytes.readUInt32LE(eocd + 16);
+  if (entries === 0 || entries > 64 || centralSize > bytes.length ||
+      offset + centralSize > eocd) return false;
+  let pos = offset;
+  let totalExpanded = 0;
+  let foundRequired = false;
+  let foundTypes = false;
+  for (let i = 0; i < entries; i++) {
+    if (pos + 46 > bytes.length || bytes.readUInt32LE(pos) !== 0x02014b50) return false;
+    const flags = bytes.readUInt16LE(pos + 8);
+    const method = bytes.readUInt16LE(pos + 10);
+    const packed = bytes.readUInt32LE(pos + 20);
+    const expanded = bytes.readUInt32LE(pos + 24);
+    const nameLength = bytes.readUInt16LE(pos + 28);
+    const extra = bytes.readUInt16LE(pos + 30);
+    const comment = bytes.readUInt16LE(pos + 32);
+    if ((flags & 1) || ![0, 8].includes(method) ||
+        expanded > 1_000_000 || (expanded && expanded > Math.max(packed, 1) * 100))
+      return false;
+    totalExpanded += expanded;
+    if (totalExpanded > 2_000_000) return false;
+    const nameStart = pos + 46;
+    if (nameStart + nameLength + extra + comment > bytes.length) return false;
+    const name = bytes.toString("utf8", nameStart, nameStart + nameLength);
+    if (name === requiredEntry) foundRequired = true;
+    if (name === "[Content_Types].xml") foundTypes = true;
+    if (name.includes("..") || name.startsWith("/") || name.includes("\\")) return false;
+    pos = nameStart + nameLength + extra + comment;
+  }
+  return pos === offset + centralSize && foundRequired && foundTypes;
+}
+
 /** Validate decoded bytes, MIME and filename together before forwarding guest files. */
 export function guestDocumentContent(doc: GuestDocument): Record<string, string> {
   const { mime, bytes } = dataUri(doc.dataUrl, 256_000);
@@ -32,8 +70,10 @@ export function guestDocumentContent(doc: GuestDocument): Record<string, string>
   if (config.magic && !bytes.subarray(0, config.magic.length).equals(Buffer.from(config.magic)))
     throw new Error("INVALID_GUEST_DOCUMENT");
   // Office documents must be ZIP archives, with a valid ZIP local file or empty archive header.
-  if (config.magic === "PK" && !["0304", "0506", "0708"].includes(bytes.subarray(2, 4).toString("hex")))
-    throw new Error("INVALID_GUEST_DOCUMENT");
+  if (config.magic === "PK") {
+    const required = config.extension === ".docx" ? "word/document.xml" : "xl/workbook.xml";
+    if (!inspectOfficeZip(bytes, required)) throw new Error("INVALID_GUEST_DOCUMENT");
+  }
   if (mime.startsWith("text/") && bytes.includes(0))
     throw new Error("INVALID_GUEST_DOCUMENT");
   return { type: "input_file", filename: safeName, file_data: doc.dataUrl };
