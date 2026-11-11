@@ -79,6 +79,46 @@ export class GeminiClient {
     }
   }
 
+  /**
+   * Structured architectural prompt endpoint used by ArchitecturalAnalyzer.
+   * Rejects missing/non-JSON responses rather than returning fabricated analysis.
+   */
+  async analyzeWithCustomPrompt(
+    imageData: string | Uint8Array,
+    systemPrompt: string,
+    prompt: string,
+  ): Promise<Record<string, unknown>> {
+    const encoded = typeof imageData === "string"
+      ? imageData : this.arrayBufferToBase64(imageData);
+    const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [
+          { text: prompt },
+          { inlineData: { mimeType: "image/jpeg", data: encoded } },
+        ] }],
+        generationConfig: {
+          temperature: 0.2, maxOutputTokens: 2048,
+          responseMimeType: "application/json",
+        },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`Gemini architectural response: ${response.status}`);
+    const data = await response.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "")
+      .join("\n").trim();
+    if (!text) throw new Error("Empty Gemini architectural response");
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      throw new Error("Invalid Gemini architectural JSON");
+    return parsed as Record<string, unknown>;
+  }
+
   private arrayBufferToBase64(buffer: Uint8Array): string {
     let binary = "";
     const bytes = new Uint8Array(buffer);
