@@ -6,7 +6,7 @@ import { accessToken } from "@/lib/foundry-transport.server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const schema = z.object({
-  agentId: z.string().regex(UUID),
+  agentId: z.string().refine((id) => UUID.test(id) || /^az-agent-[a-z0-9_-]{1,110}$/i.test(id)),
   sdp: z.string().min(30).max(32_000),
 });
 
@@ -45,10 +45,13 @@ export const guestRealtimeOffer = createServerFn({ method: "POST" })
     }
     const visitorId = requireGuestIdentity();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: agent, error } = await supabaseAdmin.from("bot_agents")
+    const lookup = supabaseAdmin.from("bot_agents")
       .select("id,agent_name,system_prompt")
-      .eq("id", data.agentId).eq("provider", "foundry")
-      .eq("is_active", true).eq("public_access", true).maybeSingle();
+      .eq("provider", "foundry")
+      .eq("is_active", true).eq("public_access", true);
+    const { data: agent, error } = await (UUID.test(data.agentId)
+      ? lookup.eq("id", data.agentId).maybeSingle()
+      : lookup.eq("agent_name", data.agentId).maybeSingle());
     if (error || !agent) throw new Error("AGENT_UNAVAILABLE");
 
     // The same transactional per-visitor and global request quota used by text chat.
