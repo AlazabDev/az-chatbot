@@ -9,15 +9,15 @@ export interface ChatMessage {
 export interface AgentTool {
   name: string;
   description: string;
-  parameters: Record<string, any>;
-  execute: (args: any, context?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  parameters: Record<string, unknown>;
+  execute: (args: Record<string, unknown>, context?: AgentContext) => Promise<{ success: boolean; data?: unknown; error?: string }>;
 }
 
 export interface AgentContext {
   conversationId?: string;
   userId?: string;
   previousMessages?: ChatMessage[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AgentExecutionResult {
@@ -25,7 +25,7 @@ export interface AgentExecutionResult {
   toolExecuted?: {
     name: string;
     success: boolean;
-    data?: any;
+    data?: unknown;
     error?: string;
   };
 }
