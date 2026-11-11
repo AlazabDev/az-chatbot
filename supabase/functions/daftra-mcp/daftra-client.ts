@@ -152,3 +152,28 @@ export async function callDaftra(op: Operation, args: Dict): Promise<ToolResult>
     return toolResult({ error: e instanceof Error ? e.message : String(e) }, true);
   }
 }
+
+
+/**
+ * Compatibility adapter for the older named Daftra MCP modules.
+ * Uses the same allowlisted host and ENABLE_WRITE_TOOLS / DRY_RUN guards as
+ * the central catalog-driven callDaftra implementation.
+ */
+export function callDaftraApi(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  relativePath: string,
+  body?: unknown,
+  query?: Record<string, string | number | boolean | null | undefined>,
+): Promise<ToolResult> {
+  const path = "/" + relativePath.replace(/^\/+/, "");
+  const operation: Operation = {
+    id: `legacy_${method.toLowerCase()}`,
+    m: method,
+    p: path,
+    s: "",
+    t: "",
+    module: "legacy",
+    params: [],
+  };
+  return callDaftra(operation, { body, query });
+}
