@@ -9,8 +9,8 @@ const AGENT = "11111111-1111-4111-8111-111111111111";
 
 describe("guest WebRTC live call", () => {
   const stopTrack = vi.fn();
-  let channel: { close: ReturnType<typeof vi.fn>; onmessage?: (e: { data: string }) => void };
-  let pc: { close: ReturnType<typeof vi.fn>; connectionState: string; onconnectionstatechange?: () => void };
+  let channel: { close: () => void; onmessage?: (e: { data: string }) => void };
+  let pc: { close: () => void; connectionState: string; onconnectionstatechange?: () => void };
 
   beforeEach(() => {
     vi.clearAllMocks();
