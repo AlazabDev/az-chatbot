@@ -11,7 +11,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: process.env.CHATBOT_E2E_URL ? undefined : {
-    command: "bun run preview --host 127.0.0.1 --port 4173",
+    command: "bunx nitro preview --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173",
     timeout: 120_000,
     reuseExistingServer: false,
