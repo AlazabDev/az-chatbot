@@ -164,8 +164,8 @@ export const workOrderTools = [
         "description", "budget", "budget_currency", "staff_id", "follow_up_status_id"
       ];
       for (const field of fields) {
-        if (args[field] !== undefined) {
-          workOrderData[field] = args[field];
+        if (args[field as keyof ToolArgs] !== undefined) {
+          workOrderData[field] = args[field as keyof ToolArgs];
         }
       }
       return await callDaftraApi("PUT", `work_orders/${args.work_order_id}.json`, { WorkOrder: workOrderData });
@@ -343,7 +343,7 @@ export const workOrderTools = [
       const apptData: Record<string, unknown> = {};
       const fields = ["date", "end_date", "status", "duration", "staff_id", "body"];
       for (const f of fields) {
-        if (args[f] !== undefined) apptData[f] = args[f];
+        if (args[f as keyof ToolArgs] !== undefined) apptData[f] = args[f as keyof ToolArgs];
       }
       return await callDaftraApi("PUT", `work_order_appointments/${args.appointment_id}.json`, {
         WorkOrderAppointment: apptData

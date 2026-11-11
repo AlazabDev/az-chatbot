@@ -93,7 +93,7 @@ export const invoiceTools = [
           currency_code: args.currency_code,
           notes: args.notes
         },
-        InvoiceItem: args.items.map((it: JournalTransaction) => ({
+        InvoiceItem: args.items.map((it: InvoiceLine) => ({
           item_id: it.item_id,
           item: it.item,
           unit_price: it.unit_price,

@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
-  const supabase = createClient(supabaseUrl, serviceKey);
+  const supabase = createWorkerClient(supabaseUrl, serviceKey);
   const workerId = `worker_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const batchSize = 10;
   const results: Array<{ job_id: number; job_type: string; status: string; error?: string }> = [];
@@ -127,12 +127,21 @@ Deno.serve(async (req) => {
   }
 });
 
-type WorkerClient = ReturnType<typeof createClient>;
+function createWorkerClient(url: string, key: string) { return createClient(url, key); }
+type WorkerClient = ReturnType<typeof createWorkerClient>;
 type WorkerPayload = {
   webhook_endpoint_id?: string; event_type?: string; payload?: unknown;
   media_id?: string; tenant_id?: string; message_id?: string; mime_type?: string;
   conversation_id?: string; wa_account_id?: string; text?: string;
   template?: { name?: string; language?: { code?: string }; components?: unknown };
+};
+type WorkflowRule = {
+  trigger: string;
+  conditions?: Array<{ type: "contains" | "has_media"; value?: string | boolean }>;
+  actions: Array<{
+    type: string; user_id?: string; note?: string; text?: string;
+    template_name?: string; language?: string;
+  }>;
 };
 type WorkerJob = {
   id: number; tenant_id?: string; job_type: string; attempts: number;
@@ -141,7 +150,7 @@ type WorkerJob = {
 type WorkflowRunAction = { action: string; status: string; error?: string };
 type TemplateComponent = { type?: string; text?: string; example?: { body_text?: string[][] } };
 type OutboundWaPayload = {
-  messaging_product: "whatsapp"; to: string | undefined;
+  messaging_product: "whatsapp"; to: string;
   type?: "text" | "template";
   template?: WorkerPayload["template"];
   text?: { body: string };
@@ -151,6 +160,7 @@ type OutboundWaPayload = {
 
 async function processWebhookDelivery(supabase: WorkerClient, job: WorkerJob) {
   const { webhook_endpoint_id, event_type, payload } = job.payload;
+  if (!webhook_endpoint_id || !event_type) throw new Error("Invalid webhook delivery job");
 
   const { data: ep } = await supabase
     .from("webhook_endpoints")
@@ -159,6 +169,7 @@ async function processWebhookDelivery(supabase: WorkerClient, job: WorkerJob) {
     .single();
 
   if (!ep || !ep.is_enabled) return;
+  if (typeof ep.url !== "string") throw new Error("Webhook endpoint URL not configured");
 
   const response = await fetch(ep.url, {
     method: "POST",
@@ -189,7 +200,7 @@ async function processMedia(supabase: WorkerClient, job: WorkerJob) {
   const waAccessToken = requireMetaAccessToken();
   const apiVersion = getMetaApiVersion();
 
-  if (!media_id) throw new Error("No media_id in payload");
+  if (!media_id || !tenant_id || !message_id) throw new Error("Incomplete media job payload");
 
   // Get media URL from WhatsApp
   const mediaInfoRes = await fetch(`https://graph.facebook.com/${apiVersion}/${media_id}`, {
@@ -319,7 +330,7 @@ async function processMedia(supabase: WorkerClient, job: WorkerJob) {
         size_bytes: mediaBytes.length,
         sha256,
       })
-      .eq("id", existingMedia.id);
+      .eq("id", String((existingMedia as { id: string }).id));
   }
 
   // Update message meta with storage info so frontend can resolve the URL
@@ -338,10 +349,12 @@ async function processMedia(supabase: WorkerClient, job: WorkerJob) {
     .single();
 
   if (currentMsg) {
+    const oldMeta = (currentMsg.meta && typeof currentMsg.meta === "object")
+      ? currentMsg.meta as { media?: Record<string, unknown> } : {};
     const updatedMeta = {
-      ...(currentMsg.meta || {}),
+      ...oldMeta,
       media: {
-        ...(currentMsg.meta?.media || {}),
+        ...(oldMeta.media || {}),
         storage_key: storageKey,
         storage_bucket: "wa-media",
         mime: mediaInfo.mime_type,
@@ -356,6 +369,7 @@ async function processMedia(supabase: WorkerClient, job: WorkerJob) {
 
 async function processWorkflow(supabase: WorkerClient, job: WorkerJob) {
   const { tenant_id, message_id, conversation_id } = job.payload;
+  if (!tenant_id || !message_id || !conversation_id) throw new Error("Incomplete workflow job payload");
 
   // Get enabled workflows for this tenant
   const { data: workflows } = await supabase
@@ -376,8 +390,8 @@ async function processWorkflow(supabase: WorkerClient, job: WorkerJob) {
   if (!message) return;
 
   for (const workflow of workflows) {
-    const rules = workflow.rules;
-    if (!rules?.trigger || !rules?.actions) continue;
+    const rules = workflow.rules as WorkflowRule | null;
+    if (!rules?.trigger || !Array.isArray(rules.actions)) continue;
 
     // Check trigger
     if (rules.trigger === "message.inbound" && message.direction !== "inbound") continue;
@@ -385,13 +399,14 @@ async function processWorkflow(supabase: WorkerClient, job: WorkerJob) {
 
     // Check conditions
     let conditionsMet = true;
+    const messageData = message as { direction?: string; status?: string; text?: string; meta?: { media?: unknown } };
     for (const condition of rules.conditions || []) {
       switch (condition.type) {
         case "contains":
-          if (!message.text?.includes(condition.value)) conditionsMet = false;
+          if (!messageData.text?.includes(String(condition.value ?? ""))) conditionsMet = false;
           break;
         case "has_media":
-          if (condition.value && !message.meta?.media) conditionsMet = false;
+          if (condition.value && !messageData.meta?.media) conditionsMet = false;
           break;
       }
     }
@@ -470,6 +485,7 @@ async function processWorkflow(supabase: WorkerClient, job: WorkerJob) {
 
 async function processTemplateSync(supabase: WorkerClient, job: WorkerJob) {
   const { tenant_id, wa_account_id } = job.payload;
+  if (!tenant_id || !wa_account_id) throw new Error("Incomplete template sync job payload");
   const waAccessToken = requireMetaAccessToken();
   const apiVersion = getMetaApiVersion();
 
@@ -516,19 +532,28 @@ async function processTemplateSync(supabase: WorkerClient, job: WorkerJob) {
 
 async function processSendMessage(supabase: WorkerClient, job: WorkerJob) {
   const { tenant_id, conversation_id, text, template } = job.payload;
+  if (!tenant_id || !conversation_id) throw new Error("Incomplete send message job payload");
   const waAccessToken = requireMetaAccessToken();
   const apiVersion = getMetaApiVersion();
 
   const { data: conv } = await supabase
     .from("conversations")
-    .select("contact_id, wa_number_id, contacts(phone_e164), wa_numbers(phone_number_id)")
+    .select("contact_id, wa_number_id")
     .eq("id", conversation_id)
+    .eq("tenant_id", tenant_id)
     .single();
 
   if (!conv) throw new Error("Conversation not found");
-
-  const recipientPhone = conv.contacts?.phone_e164?.replace("+", "");
-  const phoneNumberId = conv.wa_numbers?.phone_number_id;
+  const { data: contact } = await supabase.from("contacts")
+    .select("phone_e164").eq("id", String(conv.contact_id))
+    .eq("tenant_id", tenant_id).maybeSingle();
+  const { data: number } = await supabase.from("wa_numbers")
+    .select("phone_number_id").eq("id", String(conv.wa_number_id))
+    .eq("tenant_id", tenant_id).maybeSingle();
+  const phone = (contact as { phone_e164?: string } | null)?.phone_e164;
+  const phoneNumberId = (number as { phone_number_id?: string } | null)?.phone_number_id;
+  if (!phone || !phoneNumberId) throw new Error("Conversation contact or WA number missing");
+  const recipientPhone = phone.replace("+", "");
 
   const waPayload: OutboundWaPayload = { messaging_product: "whatsapp", to: recipientPhone };
   if (template) {
