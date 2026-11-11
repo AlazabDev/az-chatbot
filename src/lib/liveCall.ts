@@ -40,11 +40,11 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
   let closed = false;
   let stream: MediaStream | null = null;
   let channel: RTCDataChannel | null = null;
-  let callLimit: number | undefined;
+  const timer = { id: undefined as number | undefined };
   const finish = (notify: boolean) => {
     if (closed) return;
     closed = true;
-    if (callLimit !== undefined) clearTimeout(callLimit);
+    if (timer.id !== undefined) clearTimeout(timer.id);
     try { stream?.getTracks().forEach((track) => track.stop()); } catch { /* noop */ }
     try { channel?.close(); } catch { /* noop */ }
     try { pc.close(); } catch { /* noop */ }
@@ -122,7 +122,7 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
     finish(false);
     throw error;
   }
-  callLimit = window.setTimeout(() => finish(true), response.maxDurationSeconds * 1000);
+  timer.id = window.setTimeout(() => finish(true), response.maxDurationSeconds * 1000);
 
   pc.onconnectionstatechange = () => {
     if (closed) return;
