@@ -1,0 +1,905 @@
+[
+ {
+  "id": "get_workspace",
+  "m": "GET",
+  "p": "/workspace",
+  "s": "Get workspace",
+  "t": "Workspace",
+  "module": "workspace",
+  "params": [
+   {
+    "n": "include",
+    "in": "query",
+    "r": false,
+    "d": "Optional parameter to specify additional details in the response. Use 'include[]=users' to include workspace users in the result."
+   }
+  ]
+ },
+ {
+  "id": "put_workspace",
+  "m": "PUT",
+  "p": "/workspace",
+  "s": "Update workspace",
+  "t": "Workspace",
+  "module": "workspace",
+  "params": [],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "post_workspace_members_invite",
+  "m": "POST",
+  "p": "/workspace/members/invite",
+  "s": "Invite workspace members",
+  "t": "Workspace",
+  "module": "workspace",
+  "params": [],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "delete_workspace_members",
+  "m": "DELETE",
+  "p": "/workspace/members",
+  "s": "Remove workspace member",
+  "t": "Workspace",
+  "module": "workspace",
+  "params": [
+   {
+    "n": "email",
+    "in": "query",
+    "r": true,
+    "d": "The email of the member or invitee to be removed."
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the removal action."
+   }
+  ]
+ },
+ {
+  "id": "get_teams",
+  "m": "GET",
+  "p": "/teams",
+  "s": "List teams",
+  "t": "Teams",
+  "module": "teams",
+  "params": []
+ },
+ {
+  "id": "post_teams",
+  "m": "POST",
+  "p": "/teams",
+  "s": "Create team",
+  "t": "Teams",
+  "module": "teams",
+  "params": [],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "get_teams_by_id",
+  "m": "GET",
+  "p": "/teams/{id}",
+  "s": "Get team",
+  "t": "Teams",
+  "module": "teams",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ]
+ },
+ {
+  "id": "put_teams_by_id",
+  "m": "PUT",
+  "p": "/teams/{id}",
+  "s": "Update team",
+  "t": "Teams",
+  "module": "teams",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "delete_teams_by_id",
+  "m": "DELETE",
+  "p": "/teams/{id}",
+  "s": "Delete team",
+  "t": "Teams",
+  "module": "teams",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ]
+ },
+ {
+  "id": "post_teams_by_id_members",
+  "m": "POST",
+  "p": "/teams/{id}/members",
+  "s": "Add team members",
+  "t": "Teams",
+  "module": "teams",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "delete_teams_by_id_members",
+  "m": "DELETE",
+  "p": "/teams/{id}/members",
+  "s": "Remove team member",
+  "t": "Teams",
+  "module": "teams",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   },
+   {
+    "n": "email",
+    "in": "query",
+    "r": true,
+    "d": "The email of the member to be removed."
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the removal action."
+   }
+  ]
+ },
+ {
+  "id": "get_workgroup_users",
+  "m": "GET",
+  "p": "/workgroups/users",
+  "s": "List users",
+  "t": "Users",
+  "module": "users",
+  "params": []
+ },
+ {
+  "id": "get_workgroup_plans",
+  "m": "GET",
+  "p": "/workgroups/plans",
+  "s": "List plans",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "page",
+    "in": "query",
+    "r": false,
+    "d": "Page number. Check next_page field in the response's paging object to determine whether to call for the next page."
+   },
+   {
+    "n": "sort",
+    "in": "query",
+    "r": false,
+    "d": "Sort field."
+   },
+   {
+    "n": "direction",
+    "in": "query",
+    "r": false,
+    "d": ""
+   },
+   {
+    "n": "id",
+    "in": "query",
+    "r": false,
+    "d": ""
+   },
+   {
+    "n": "user_email",
+    "in": "query",
+    "r": false,
+    "d": "Specify a user's email address to retrieve plans owned by this user within the workgroup."
+   },
+   {
+    "n": "name",
+    "in": "query",
+    "r": false,
+    "d": "Filter the list by plan name. Accepts a string for partial or exact match of the plan name."
+   },
+   {
+    "n": "creation_date",
+    "in": "query",
+    "r": false,
+    "d": "Filter the list by the creation date of the plan. Accepts a date string in the format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'."
+   },
+   {
+    "n": "update_date",
+    "in": "query",
+    "r": false,
+    "d": "Filter the list by the last update date of the plan. Accepts a date string in the format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'."
+   }
+  ]
+ },
+ {
+  "id": "get_plan",
+  "m": "GET",
+  "p": "/plans/get/{id}",
+  "s": "Get plan",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the plan to retrieve"
+   },
+   {
+    "n": "floor_svg_dimensions",
+    "in": "query",
+    "r": false,
+    "d": "Controls the rendering of lines demonstrating dimensions on floor renderings."
+   },
+   {
+    "n": "room_svg_dimensions",
+    "in": "query",
+    "r": false,
+    "d": "Controls the rendering of lines demonstrating dimensions on room renderings."
+   },
+   {
+    "n": "floor_svg_show_annotations",
+    "in": "query",
+    "r": false,
+    "d": "Render blue annotation bubbles on floor renderings (default is false)."
+   },
+   {
+    "n": "room_svg_show_annotations",
+    "in": "query",
+    "r": false,
+    "d": "Render blue annotation bubbles on room renderings (default is true)."
+   }
+  ]
+ },
+ {
+  "id": "delete_plan",
+  "m": "DELETE",
+  "p": "/plans/{id}",
+  "s": "Delete plan",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the plan to delete"
+   }
+  ]
+ },
+ {
+  "id": "get_plan_statistics",
+  "m": "GET",
+  "p": "/plans/statistics/{id}",
+  "s": "Get plan statistics",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier for the plan"
+   }
+  ]
+ },
+ {
+  "id": "get_plan_forms",
+  "m": "GET",
+  "p": "/plans/forms/{id}",
+  "s": "Get plan forms",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier for the plan"
+   }
+  ]
+ },
+ {
+  "id": "reassign_owner",
+  "m": "PUT",
+  "p": "/plans/{id}/owner",
+  "s": "Reassign plan owner",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier for the plan"
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "list_plan_files",
+  "m": "GET",
+  "p": "/plans/{id}/files",
+  "s": "List plan files",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   },
+   {
+    "n": "modified_since",
+    "in": "query",
+    "r": false,
+    "d": "Start date and time for filtering ('YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS')"
+   },
+   {
+    "n": "modified_until",
+    "in": "query",
+    "r": false,
+    "d": "End date and time for filtering ('YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS')"
+   },
+   {
+    "n": "include_photos",
+    "in": "query",
+    "r": false,
+    "d": "A boolean flag to indicate whether user-captured photos should be included"
+   },
+   {
+    "n": "format",
+    "in": "query",
+    "r": false,
+    "d": "Allow users to specify the file format(s) they want to filter by."
+   }
+  ]
+ },
+ {
+  "id": "plan_custom_export",
+  "m": "POST",
+  "p": "/plans/{id}/custom-export",
+  "s": "Plan custom export",
+  "t": "Plans",
+  "module": "plans",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the export action."
+   }
+  ]
+ },
+ {
+  "id": "list_projects",
+  "m": "GET",
+  "p": "/projects",
+  "s": "List projects",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "sort",
+    "in": "query",
+    "r": false,
+    "d": ""
+   },
+   {
+    "n": "direction",
+    "in": "query",
+    "r": false,
+    "d": ""
+   },
+   {
+    "n": "page",
+    "in": "query",
+    "r": false,
+    "d": "Page number for pagination. Defaults to 1 if not provided."
+   },
+   {
+    "n": "page_size",
+    "in": "query",
+    "r": false,
+    "d": "Number of items per page. Defaults to 10 if not provided. Maximum value is 50."
+   },
+   {
+    "n": "email",
+    "in": "query",
+    "r": false,
+    "d": "Specify a user's email address to retrieve projects assigned to this user within the workspace."
+   },
+   {
+    "n": "name",
+    "in": "query",
+    "r": false,
+    "d": "Filter the list by project name. Accepts a string for partial or exact match of the project name."
+   }
+  ]
+ },
+ {
+  "id": "create_new_project",
+  "m": "POST",
+  "p": "/projects",
+  "s": "Create project",
+  "t": "Projects",
+  "module": "projects",
+  "params": [],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "update_project_with_body_id",
+  "m": "PUT",
+  "p": "/projects",
+  "s": "Update project (ID in body)",
+  "t": "Projects",
+  "module": "projects",
+  "params": [],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "get_project",
+  "m": "GET",
+  "p": "/projects/{id}",
+  "s": "Get project",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ]
+ },
+ {
+  "id": "update_project",
+  "m": "PUT",
+  "p": "/projects/{id}",
+  "s": "Update project",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project"
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "delete_project",
+  "m": "DELETE",
+  "p": "/projects/{id}",
+  "s": "Delete project",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project"
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The user performing the action."
+   }
+  ]
+ },
+ {
+  "id": "archive_project",
+  "m": "PUT",
+  "p": "/projects/{id}/archive",
+  "s": "Archive project",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project"
+   }
+  ],
+  "body": {
+   "r": false
+  }
+ },
+ {
+  "id": "restore_project",
+  "m": "PUT",
+  "p": "/projects/{id}/restore",
+  "s": "Restore archived project",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project"
+   }
+  ],
+  "body": {
+   "r": false
+  }
+ },
+ {
+  "id": "get_project_plan",
+  "m": "GET",
+  "p": "/projects/{id}/plan",
+  "s": "Get project plan",
+  "t": "Projects",
+  "module": "projects",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier for the project"
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   },
+   {
+    "n": "floor_svg_dimensions",
+    "in": "query",
+    "r": false,
+    "d": "Controls the rendering of dimensions on floor SVGs."
+   },
+   {
+    "n": "room_svg_dimensions",
+    "in": "query",
+    "r": false,
+    "d": "Controls the rendering of dimensions on room SVGs."
+   },
+   {
+    "n": "floor_svg_show_annotations",
+    "in": "query",
+    "r": false,
+    "d": "Controls whether annotations are rendered on floor SVGs."
+   },
+   {
+    "n": "room_svg_show_annotations",
+    "in": "query",
+    "r": false,
+    "d": "Controls whether annotations are rendered on room SVGs."
+   }
+  ]
+ },
+ {
+  "id": "post_projects_by_id_files_temporary_presigned_url",
+  "m": "POST",
+  "p": "/projects/{id}/files/temporary-presigned-url",
+  "s": "File upload - Get Pre-signed URL",
+  "t": "Project Files",
+  "module": "project_files",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "register_project_files",
+  "m": "POST",
+  "p": "/projects/{id}/files",
+  "s": "File upload - Register",
+  "t": "Project Files",
+  "module": "project_files",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "The ID of the project to associate the file with"
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "get_project_files",
+  "m": "GET",
+  "p": "/projects/{id}/files",
+  "s": "Get project files",
+  "t": "Project Files",
+  "module": "project_files",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project"
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   },
+   {
+    "n": "page",
+    "in": "query",
+    "r": false,
+    "d": "Page number for pagination. Defaults to 1 if not provided."
+   },
+   {
+    "n": "page_size",
+    "in": "query",
+    "r": false,
+    "d": "Number of items per page. Defaults to 10 if not provided. Maximum value is 50."
+   }
+  ]
+ },
+ {
+  "id": "delete_project_files",
+  "m": "DELETE",
+  "p": "/projects/{id}/files/{fileId}",
+  "s": "Delete project files",
+  "t": "Project Files",
+  "module": "project_files",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project"
+   },
+   {
+    "n": "fileId",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the file"
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The user performing the action."
+   }
+  ]
+ },
+ {
+  "id": "plan_image",
+  "m": "GET",
+  "p": "/images/plan/{id}/svg/{fileName}",
+  "s": "Load image",
+  "t": "Images",
+  "module": "images",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": ""
+   },
+   {
+    "n": "fileName",
+    "in": "path",
+    "r": true,
+    "d": ""
+   }
+  ]
+ },
+ {
+  "id": "list_forms",
+  "m": "GET",
+  "p": "/forms",
+  "s": "List forms",
+  "t": "Forms",
+  "module": "forms",
+  "params": [
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   }
+  ]
+ },
+ {
+  "id": "create_form",
+  "m": "POST",
+  "p": "/forms",
+  "s": "Create form",
+  "t": "Forms",
+  "module": "forms",
+  "params": [],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "get_form",
+  "m": "GET",
+  "p": "/forms/{id}",
+  "s": "Get form",
+  "t": "Forms",
+  "module": "forms",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the form."
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   }
+  ]
+ },
+ {
+  "id": "update_form",
+  "m": "PUT",
+  "p": "/forms/{id}",
+  "s": "Update form",
+  "t": "Forms",
+  "module": "forms",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the form"
+   }
+  ],
+  "body": {
+   "r": true
+  }
+ },
+ {
+  "id": "delete_form",
+  "m": "DELETE",
+  "p": "/forms/{id}",
+  "s": "Delete form",
+  "t": "Forms",
+  "module": "forms",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the form."
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   }
+  ]
+ },
+ {
+  "id": "list_estimates",
+  "m": "GET",
+  "p": "/projects/{id}/estimates",
+  "s": "List estimates",
+  "t": "Estimates",
+  "module": "estimates",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project."
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   },
+   {
+    "n": "page",
+    "in": "query",
+    "r": false,
+    "d": "Page number for pagination. Defaults to 1 if not provided."
+   },
+   {
+    "n": "page_size",
+    "in": "query",
+    "r": false,
+    "d": "Number of items per page. Defaults to 10 if not provided. Maximum value is 50."
+   }
+  ]
+ },
+ {
+  "id": "get_estimate",
+  "m": "GET",
+  "p": "/projects/{id}/estimates/{estimateId}",
+  "s": "Get estimate",
+  "t": "Estimates",
+  "module": "estimates",
+  "params": [
+   {
+    "n": "id",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the project."
+   },
+   {
+    "n": "estimateId",
+    "in": "path",
+    "r": true,
+    "d": "Unique identifier of the estimate."
+   },
+   {
+    "n": "acting_user",
+    "in": "query",
+    "r": false,
+    "d": "The email of the user performing the action."
+   }
+  ]
+ }
+]
