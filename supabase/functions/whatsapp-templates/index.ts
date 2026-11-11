@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const accountId = typeof body.account_id === "string" ? body.account_id : null;
     if (!["submit", "sync", "delete"].includes(action)) return json({ error: "invalid action" }, 400);
 
-    let tpl: { id: string; account_id?: string; name: string; language: string; category?: string; components?: unknown } | null = null;
+    let tpl: { id: string; account_id?: string; name: string; language: string; category?: string; components?: unknown; meta_template_id?: string | null } | null = null;
     if (templateId) {
       const { data } = await admin.from("message_templates").select("*").eq("id", templateId).eq("user_id", userId).maybeSingle();
       if (!data) return json({ error: "القالب غير موجود" }, 404);
