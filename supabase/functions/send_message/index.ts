@@ -180,6 +180,6 @@ Deno.serve(async (req) => {
     return json({ success: true, message_id: message?.id, provider_message_id: providerMessageId });
   } catch (err) {
     console.error("send_message error:", err);
-    return json({ error: err.message }, 500);
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
