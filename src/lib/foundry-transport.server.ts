@@ -14,7 +14,7 @@ export function foundryBase(): string {
   return url.toString().replace(/\/+$/, "");
 }
 
-export async function accessToken(): Promise<string> {
+async function accessToken(): Promise<string> {
   if (cache && cache.until > Date.now() + 60_000) return cache.token;
   const tenant = process.env.FOUNDRY_TENANT_ID;
   const client = process.env.FOUNDRY_CLIENT_ID;

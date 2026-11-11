@@ -1,4 +1,5 @@
-import { guestRealtimeOffer } from "@/lib/guestRealtime.functions";
+import { foundryRealtimeSession } from "@/lib/foundry.functions";
+import { logChatError } from "@/lib/chatErrors";
 
 export interface LiveCallHandle {
   stop: () => void;
@@ -25,13 +26,19 @@ interface RealtimeEvent {
  * Realtime session minted server-side. Throws a controlled local error when
  * Realtime is unavailable so the caller can fall back without a server 500.
  */
-export async function startLiveCall(agentId: string, callbacks: LiveCallCallbacks): Promise<LiveCallHandle> {
+export async function startLiveCall(callbacks: LiveCallCallbacks): Promise<LiveCallHandle> {
   if (typeof window === "undefined" || !window.RTCPeerConnection) {
     throw new Error("WEBRTC_UNSUPPORTED");
   }
 
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(agentId))
-    throw new Error("REALTIME_AGENT_UNAVAILABLE");
+  const session = await foundryRealtimeSession({ data: {} });
+  if (!session.supported) {
+    throw new Error("REALTIME_UNAVAILABLE");
+  }
+
+  const token = session.client_secret?.value;
+  const url = session.webrtc_url;
+  if (!token || !url) throw new Error("REALTIME_UNAVAILABLE");
 
   const pc = new RTCPeerConnection();
   const audio = new Audio();
@@ -90,29 +97,22 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
 
-  let response: Awaited<ReturnType<typeof guestRealtimeOffer>>;
-  try {
-    response = await guestRealtimeOffer({ data: { agentId, sdp: offer.sdp ?? "" } });
-  } catch (error) {
+  const res = await fetch(url, {
+    method: "POST",
+    body: offer.sdp ?? "",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/sdp",
+    },
+  });
+  if (!res.ok) {
+    logChatError("realtime-sdp", `${res.status}`);
     stream.getTracks().forEach((t) => t.stop());
     pc.close();
-    throw error;
+    throw new Error("REALTIME_HANDSHAKE_FAILED");
   }
-  if (!response.supported) {
-    stream.getTracks().forEach((t) => t.stop());
-    pc.close();
-    throw new Error("REALTIME_UNAVAILABLE");
-  }
-  await pc.setRemoteDescription({ type: "answer", sdp: response.sdpAnswer });
-  const callLimit = window.setTimeout(() => {
-    if (closed) return;
-    closed = true;
-    stream.getTracks().forEach((t) => t.stop());
-    channel.close();
-    pc.close();
-    audio.srcObject = null;
-    callbacks.onClosed?.();
-  }, response.maxDurationSeconds * 1000);
+
+  await pc.setRemoteDescription({ type: "answer", sdp: await res.text() });
 
   pc.onconnectionstatechange = () => {
     if (pc.connectionState === "connected") callbacks.onConnected?.();
@@ -129,7 +129,6 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
   return {
     stop: () => {
       closed = true;
-      window.clearTimeout(callLimit);
       try {
         stream.getTracks().forEach((t) => t.stop());
         channel.close();

@@ -28,7 +28,7 @@ const inputSchema = z.object({
   currentAgentId: z.string().max(60).optional(),
   forceAgentId: z.string().max(60).optional(),
   history: z
-    .array(z.object({ role: z.literal("user"), content: z.string().max(4000) }))
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) }))
     .max(20)
     .optional()
     .default([]),

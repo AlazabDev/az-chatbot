@@ -29,7 +29,6 @@ import { Route as AdminRolesRouteImport } from './routes/admin.roles'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminTrainingRouteImport } from './routes/admin.training'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as SupportIndexRouteImport } from './routes/support.index'
 import { Route as SupportDiagnosticsRouteImport } from './routes/support.diagnostics'
 import { Route as SupportDocumentationRouteImport } from './routes/support.documentation'
@@ -139,11 +138,6 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SupportIndexRoute = SupportIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -205,7 +199,6 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
-  '/api/health': typeof ApiHealthRoute
   '/support/diagnostics': typeof SupportDiagnosticsRoute
   '/support/documentation': typeof SupportDocumentationRoute
   '/support/faq': typeof SupportFaqRoute
@@ -234,7 +227,6 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
-  '/api/health': typeof ApiHealthRoute
   '/support/diagnostics': typeof SupportDiagnosticsRoute
   '/support/documentation': typeof SupportDocumentationRoute
   '/support/faq': typeof SupportFaqRoute
@@ -266,7 +258,6 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
-  '/api/health': typeof ApiHealthRoute
   '/support/diagnostics': typeof SupportDiagnosticsRoute
   '/support/documentation': typeof SupportDocumentationRoute
   '/support/faq': typeof SupportFaqRoute
@@ -299,7 +290,6 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/training'
     | '/admin/users'
-    | '/api/health'
     | '/support/diagnostics'
     | '/support/documentation'
     | '/support/faq'
@@ -328,7 +318,6 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/training'
     | '/admin/users'
-    | '/api/health'
     | '/support/diagnostics'
     | '/support/documentation'
     | '/support/faq'
@@ -359,7 +348,6 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/training'
     | '/admin/users'
-    | '/api/health'
     | '/support/diagnostics'
     | '/support/documentation'
     | '/support/faq'
@@ -378,7 +366,6 @@ export interface RootRouteChildren {
   EmbedRoute: typeof EmbedRoute
   HelpRoute: typeof HelpRoute
   SupportRoute: typeof SupportRouteWithChildren
-  ApiHealthRoute: typeof ApiHealthRoute
   ApiPublicAgentsSlugRoute: typeof ApiPublicAgentsSlugRoute
 }
 
@@ -524,13 +511,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/support/': {
       id: '/support/'
       path: '/'
@@ -656,7 +636,6 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedRoute: EmbedRoute,
   HelpRoute: HelpRoute,
   SupportRoute: SupportRouteWithChildren,
-  ApiHealthRoute: ApiHealthRoute,
   ApiPublicAgentsSlugRoute: ApiPublicAgentsSlugRoute,
 }
 export const routeTree = rootRouteImport

@@ -69,8 +69,9 @@ export function VoiceCall({
     // speech-recognition turn loop when realtime isn't available.
     (async () => {
       try {
-        if (!selectedAgentId) throw new Error("REALTIME_AGENT_UNAVAILABLE");
-        const handle = await startLiveCall(selectedAgentId, {
+        // A generic realtime deployment cannot preserve a selected agent's identity.
+        if (selectedAgentId) throw new Error("Use selected agent voice conversation");
+        const handle = await startLiveCall({
           onConnected: () => {
             if (!activeRef.current) return;
             setLive(true);
