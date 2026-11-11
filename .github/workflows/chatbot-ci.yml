@@ -16,31 +16,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Validate deployment script syntax and completion
+      - name: Validate PM2 deploy.sh
         run: |
           bash -n deploy.sh
-          test "$(wc -l < deploy.sh)" -ge 130
-          grep -q '^# END AZ-CHATBOT PM2 DEPLOY
-        with:
-          bun-version: '1.3.3'
-      - run: bun install --frozen-lockfile
-      - name: Build and regenerate TanStack route tree
-        run: bun run build
-      - name: Archive immutable build for rollback
-        uses: actions/upload-artifact@v4
-        with:
-          name: chatbot-build-${{ github.sha }}
-          path: .output/
-          include-hidden-files: true
-          retention-days: 14
-          if-no-files-found: error
-      - name: TypeScript
-        run: bunx tsc --noEmit
-      - name: ESLint — entire repository
-        run: bun run lint
-      - name: Vitest
-        run: bun run test
- deploy.sh
+          test $(wc -l < deploy.sh) -ge 130
+          tail -n 1 deploy.sh | grep -Fq 'END AZ-CHATBOT PM2 DEPLOY'
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.3'
