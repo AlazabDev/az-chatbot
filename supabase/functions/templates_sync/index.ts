@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
 
     for (const t of templates) {
       const category = categoryMap[t.category] || "UTILITY";
-      const component = t.components?.find((c: any) => c.type === "BODY");
+      const component = t.components?.find((c: { type?: string; text?: string }) => c.type === "BODY");
       const bodyText = component?.text || "";
       const variables = component?.example?.body_text?.[0] || [];
 
