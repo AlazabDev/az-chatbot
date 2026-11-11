@@ -1,96 +1,137 @@
 #!/usr/bin/env bash
-# AZ-Chatbot deploy: existing /mnt/ai/az-chatbot checkout -> Nitro Node -> PM2
-# Domain: bot.alazab.com (reverse proxy is managed independently)
+# AZ-Chatbot PM2 deployment, source /mnt/ai/az-chatbot, domain bot.alazab.com.
+# Reverse proxy / HTTPS are managed separately. No secret files are generated.
 set -Eeuo pipefail
 umask 027
-
-PROJECT_DIR="${PROJECT_DIR:-/mnt/ai/az-chatbot}"
-DOMAIN="bot.alazab.com"
-APP_NAME="${APP_NAME:-alazab-bot}"
-APP_PORT="${APP_PORT:-3100}"
-PROBE_PORT="${PROBE_PORT:-3199}"
-REF="${REF:-origin/main}"
-KEEP_RELEASES="${KEEP_RELEASES:-4}"
-MODE="${1:-deploy}"
-DEPLOY_DIR="$PROJECT_DIR/.deploy"
-RELEASES="$DEPLOY_DIR/releases"
-CURRENT="$DEPLOY_DIR/current"
-PREVIOUS="$DEPLOY_DIR/previous"
-BUILD_DIR=""
-PROBE_NAME=""
-NEW_RELEASE=""
-OLD_RELEASE=""
+ROOT=/mnt/ai/az-chatbot
+NAME=alazab-bot
+LIVE_PORT=3100
+TEST_PORT=3199
+BASE=$ROOT/.deploy
+RELEASES=$BASE/releases
+CURRENT=$BASE/current
+PREVIOUS=$BASE/previous
+MODE=$1
+WORKTREE=""
+PROBE=""
+OLD=""
 SWITCHED=0
-
-log() { printf '[AZ-BOT %s] %s\n' "$(date -u +'%F %T UTC')" "$*"; }
-fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-require() { command -v "$1" >/dev/null 2>&1 || fail "Command not installed: $1"; }
-link_target() { readlink -f "$1" 2>/dev/null || true; }
-health() {
-  local port="$1" count="${2:-25}" i body
-  for ((i=1;i<=count;i++)); do
-    body="$(curl -fsS --connect-timeout 2 --max-time 4 "http://127.0.0.1:${port}/api/health" 2>/dev/null || true)"
-    if [[ "$body" == *'"status":"ok"'* ]]; then return 0; fi
+log(){ printf '[AZ-BOT] %s\n' "$*"; }
+die(){ printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+need(){ command -v "$1" >/dev/null || die "Missing command: $1"; }
+link_target(){ [[ -L "$1" ]] && readlink -f "$1" || true; }
+valid(){ [[ -n "$1" && -f "$1/server/index.mjs" ]]; }
+point_to(){ ln -sfn "$2" "$1.next"; mv -Tf "$1.next" "$1"; }
+health(){
+  local port=$1 retries=20 i result
+  for ((i=0;i<retries;i++)); do
+    result=$(curl -fsS --max-time 4 "http://127.0.0.1:$port/api/health" 2>/dev/null || true)
+    [[ "$result" == *'"status":"ok"'* ]] && return 0
     sleep 2
   done
   return 1
 }
-
-# PM2 controls processes per Unix account. Root is intentionally supported on
-# azab-orchestrator, where the operator invokes this script as root.
-# Do not silently switch accounts: root PM2 and user PM2 are separate process lists.
-log "PM2 owner: $(id -un) (uid=$EUID), PM2_HOME=${PM2_HOME:-$HOME/.pm2}"
-[[ "$PROJECT_DIR" == /mnt/ai/az-chatbot ]] || fail 'Unexpected project path; expected /mnt/ai/az-chatbot.'
-[[ "$APP_NAME" =~ ^[a-zA-Z0-9._-]+$ ]] || fail 'Invalid APP_NAME.'
-[[ "$APP_PORT" =~ ^[0-9]+$ && "$PROBE_PORT" =~ ^[0-9]+$ ]] || fail 'Invalid ports.'
-(( APP_PORT >= 1024 && APP_PORT <= 65535 && PROBE_PORT >= 1024 && PROBE_PORT <= 65535 )) || fail 'Port out of range.'
-[[ "$APP_PORT" != "$PROBE_PORT" ]] || fail 'Live and probe ports cannot be equal.'
-[[ "$KEEP_RELEASES" =~ ^[1-9][0-9]*$ ]] || fail 'KEEP_RELEASES must be a positive integer.'
-require git; require node; require bun; require pm2; require curl; require readlink
-[[ -d "$PROJECT_DIR/.git" || -f "$PROJECT_DIR/.git" ]] || fail "Git repository missing: $PROJECT_DIR"
-[[ -w "$PROJECT_DIR" ]] || fail "Project directory isn't writable: $PROJECT_DIR"
+start_app(){
+  local app=$1 dir=$2 port=$3
+  valid "$dir" || die "Node Nitro entrypoint missing: $dir"
+  HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT="$port" NITRO_PORT="$port" NODE_ENV=production \
+    pm2 start "$dir/server/index.mjs" --name "$app" --interpreter "$(command -v node)" --cwd "$dir" --time
+}
+restore(){
+  pm2 delete "$NAME" >/dev/null 2>&1 || true
+  if valid "$OLD"; then
+    point_to "$CURRENT" "$OLD"
+    start_app "$NAME" "$OLD" "$LIVE_PORT" || return 1
+    health "$LIVE_PORT" || log 'WARNING: previous release unhealthy'
+  else
+    rm -f "$CURRENT"
+  fi
+}
+cleanup(){
+  local rc=$?
+  trap - EXIT
+  [[ -z "$PROBE" ]] || pm2 delete "$PROBE" >/dev/null 2>&1 || true
+  if [[ -n "$WORKTREE" && -d "$WORKTREE" ]]; then
+    git -C "$ROOT" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+  fi
+  if ((rc!=0 && SWITCHED==1)); then restore || true; fi
+  exit "$rc"
+}
+trap cleanup EXIT
+for x in git node bun pm2 curl readlink; do need "$x"; done
+[[ -d "$ROOT/.git" || -f "$ROOT/.git" ]] || die "Missing checkout: $ROOT"
 mkdir -p "$RELEASES"
-
-# Never fetch, build, or alter the live tree for read-only commands.
+log "PM2 account: $(id -un) / $HOME/.pm2"
 case "$MODE" in
   status)
-    pm2 describe "$APP_NAME" || true
-    printf '\nLocal /api/health: '
-    curl -fsS --max-time 6 "http://127.0.0.1:${APP_PORT}/api/health" || true
-    printf '\nCurrent release: %s\n' "$(link_target "$CURRENT")"
+    pm2 describe "$NAME" || true
+    curl -i --max-time 7 "http://127.0.0.1:$LIVE_PORT/api/health" || true
+    printf '\ncurrent=%s\nprevious=%s\n' "$(link_target "$CURRENT")" "$(link_target "$PREVIOUS")"
     exit 0 ;;
-  logs) pm2 logs "$APP_NAME" --lines 100 --nostream; exit 0 ;;
+  logs) pm2 logs "$NAME" --lines 70 --nostream; exit 0 ;;
   rollback)
-    [[ -L "$PREVIOUS" ]] || fail 'No previous release available.'
-    new_target="$(link_target "$PREVIOUS")"
-    [[ -f "$new_target/server/index.mjs" ]] || fail 'Saved release is not executable.'
-    old_target="$(link_target "$CURRENT")"
-    # Do not replace PM2 until we have confirmed the old build exists.
-    pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
-    ln -sfn "$new_target" "$CURRENT.next"; mv -Tf "$CURRENT.next" "$CURRENT"
-    HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT="$APP_PORT" NITRO_PORT="$APP_PORT" NODE_ENV=production \
-      pm2 start "$CURRENT/server/index.mjs" --name "$APP_NAME" --interpreter "$(command -v node)" --cwd "$CURRENT" --time
-    if ! health "$APP_PORT" 25; then
-      pm2 logs "$APP_NAME" --lines 40 --nostream >&2 || true
-      if [[ -f "$old_target/server/index.mjs" ]]; then
-        pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
-        ln -sfn "$old_target" "$CURRENT.next"; mv -Tf "$CURRENT.next" "$CURRENT"
-        HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT="$APP_PORT" NITRO_PORT="$APP_PORT" NODE_ENV=production \
-          pm2 start "$CURRENT/server/index.mjs" --name "$APP_NAME" --interpreter "$(command -v node)" --cwd "$CURRENT" --time || true
-      fi
-      fail 'Rollback health check failed. Attempted restoration of original release.'
-    fi
-    [[ -n "$old_target" && -d "$old_target" ]] && { ln -sfn "$old_target" "$PREVIOUS.next"; mv -Tf "$PREVIOUS.next" "$PREVIOUS"; }
+    fallback=$(link_target "$PREVIOUS")
+    valid "$fallback" || die 'No previous release'
+    OLD=$(link_target "$CURRENT")
+    SWITCHED=1
+    pm2 delete "$NAME" >/dev/null 2>&1 || true
+    point_to "$CURRENT" "$fallback"
+    start_app "$NAME" "$fallback" "$LIVE_PORT"
+    health "$LIVE_PORT" || die 'Rollback failed, restoring old release'
+    SWITCHED=0
+    if valid "$OLD"; then point_to "$PREVIOUS" "$OLD"; fi
     pm2 save --force >/dev/null
-    log "Rollback OK -> $(link_target "$CURRENT")"
+    log 'Rollback healthy'
     exit 0 ;;
   deploy) ;;
-  *) fail 'Usage: bash deploy-bot-pm2.sh [deploy|status|logs|rollback]' ;;
+  *) die 'Usage: bash deploy.sh [deploy|status|logs|rollback]' ;;
 esac
-
-cleanup() {
-  local exit_status="$?"
-  trap - EXIT
-  if [[ -n "$PROBE_NAME" ]]; then pm2 delete "$PROBE_NAME" >/dev/null 2>&1 || true; fi
-  if [[ -n "$BUILD_DIR" && -d "$BUILD_DIR/src" ]]; then
-    git -C "$PROJECT_DIR" worktree remove --force "$BUILD_DIR/src" >/dev/null 2>&1 || true
+OLD=$(link_target "$CURRENT")
+if pm2 describe "$NAME" >/dev/null 2>&1 && ! valid "$OLD"; then
+  die "Refusing to overwrite unmanaged PM2 process $NAME"
+fi
+git -C "$ROOT" fetch --quiet origin main
+COMMIT=$(git -C "$ROOT" rev-parse --verify 'origin/main^{commit}')
+SHORT=$(printf '%s' "$COMMIT" | cut -c1-12)
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+WORKTREE=$BASE/worktree-$STAMP-$$
+NEW=$RELEASES/$STAMP-$SHORT
+git -C "$ROOT" worktree add --quiet --detach "$WORKTREE" "$COMMIT"
+log "Building $SHORT as Nitro node_server (local checkout untouched)"
+(
+  cd "$WORKTREE"
+  bun install --frozen-lockfile
+  NITRO_PRESET=node_server bun run build
+  [[ -s .output/server/index.mjs ]] || die 'Node server build artifact missing'
+  bunx tsc --noEmit
+  bun run lint
+  bun run test
+)
+mkdir -p "$NEW"
+cp -a "$WORKTREE/.output/." "$NEW/"
+valid "$NEW" || die 'Invalid release'
+git -C "$ROOT" worktree remove --force "$WORKTREE"
+WORKTREE=""
+PROBE=$NAME-probe-$SHORT
+pm2 describe "$PROBE" >/dev/null 2>&1 && die 'Probe process already exists'
+start_app "$PROBE" "$NEW" "$TEST_PORT"
+if ! health "$TEST_PORT"; then
+  pm2 logs "$PROBE" --lines 50 --nostream >&2 || true
+  die 'Probe /api/health FAILED. Existing service unchanged. Check runtime config.'
+fi
+pm2 delete "$PROBE" >/dev/null 2>&1 || true
+PROBE=""
+log 'Candidate healthy'
+if valid "$OLD"; then point_to "$PREVIOUS" "$OLD"; fi
+SWITCHED=1
+pm2 delete "$NAME" >/dev/null 2>&1 || true
+point_to "$CURRENT" "$NEW"
+start_app "$NAME" "$NEW" "$LIVE_PORT"
+if ! health "$LIVE_PORT"; then
+  pm2 logs "$NAME" --lines 50 --nostream >&2 || true
+  die 'Live health FAILED; restoring old release'
+fi
+SWITCHED=0
+pm2 save --force >/dev/null
+log "SUCCESS $SHORT; bot.alazab.com -> 127.0.0.1:$LIVE_PORT (Nginx separate)"
+# END AZ-CHATBOT PM2 DEPLOY
