@@ -23,8 +23,11 @@ function toIsoFromWaTimestamp(ts?: string): string {
   return new Date(asNumber * 1000).toISOString();
 }
 
+function createInboundClient(url: string, key: string) { return createClient(url, key); }
+type InboundClient = ReturnType<typeof createInboundClient>;
+
 async function pickWaNumberForSender(
-  supabase: ReturnType<typeof createClient>,
+  supabase: InboundClient,
   waNumbers: Array<{ id: string; tenant_id: string; created_at?: string }>,
   senderPhone: string,
   preferredTenantId?: string,
@@ -56,7 +59,7 @@ async function pickWaNumberForSender(
       .select("id, last_message_at")
       .eq("tenant_id", candidate.tenant_id)
       .eq("wa_number_id", candidate.id)
-      .eq("contact_id", contact.id)
+      .eq("contact_id", String((contact as { id: string }).id))
       .eq("status", "open")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(1)
@@ -71,7 +74,7 @@ async function pickWaNumberForSender(
         .from("messages")
         .select("id")
         .eq("tenant_id", candidate.tenant_id)
-        .eq("conversation_id", conversation.id)
+        .eq("conversation_id", String((conversation as { id: string }).id))
         .eq("direction", "outbound")
         .limit(1)
         .maybeSingle();
@@ -126,7 +129,7 @@ Deno.serve(async (req) => {
     }
 
     const payload = JSON.parse(bodyText);
-    const supabase = createClient(
+    const supabase = createInboundClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
