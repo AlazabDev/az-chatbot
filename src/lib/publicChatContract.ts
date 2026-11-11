@@ -3,7 +3,7 @@ import { z } from "zod";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The only accepted external contract for public REST and TanStack RPC. */
-export const publicChatSchema = z.object({
+const publicChatObject = z.object({
   agentId: z.string().regex(UUID),
   // Kept for old clients. The authoritative visitor identity is the signed cookie.
   visitorId: z.string().uuid().optional(),
@@ -19,10 +19,18 @@ export const publicChatSchema = z.object({
     name: z.string().max(255),
     type: z.string().max(128),
   })).max(10).default([]),
-}).refine((data) => data.message.length > 0 || Boolean(data.images?.length) ||
-  Boolean(data.documents?.length), { message: "MESSAGE_OR_MEDIA_REQUIRED" });
+});
+const requireMessageOrMedia = (data: {
+  message: string;
+  images?: unknown[];
+  documents?: unknown[];
+}) => data.message.length > 0 || Boolean(data.images?.length) || Boolean(data.documents?.length);
 
-export const publicRestChatSchema = publicChatSchema.omit({ agentId: true });
+export const publicChatSchema = publicChatObject.refine(requireMessageOrMedia, {
+  message: "MESSAGE_OR_MEDIA_REQUIRED",
+});
+export const publicRestChatSchema = publicChatObject.omit({ agentId: true })
+  .refine(requireMessageOrMedia, { message: "MESSAGE_OR_MEDIA_REQUIRED" });
 
 export type PublicChatRequest = z.infer<typeof publicChatSchema>;
 
