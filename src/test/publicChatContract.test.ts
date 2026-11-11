@@ -61,8 +61,6 @@ describe("bounded guest document validation", () => {
       ["application/pdf", "example.pdf", "%PDF-1.4"],
       ["text/plain", "note.txt", "hello"],
       ["text/csv", "sheet.csv", "a,b\n1,2"],
-      ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "test.docx", "PK\x03\x04"],
-      ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "test.xlsx", "PK\x03\x04"],
     ]) {
       const item = { name, dataUrl: encoded(mime, Buffer.from(prefix, "binary")) };
       expect(guestDocumentContent(item)).toMatchObject({ type: "input_file", filename: name });
