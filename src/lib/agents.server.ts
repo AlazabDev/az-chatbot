@@ -27,6 +27,7 @@ export async function resolveAgent(agentId?: string | null): Promise<AgentConfig
         "id,name,provider,agent_name,agent_version,deployment,system_prompt,temperature,max_tokens,is_active",
       )
       .eq("is_active", true)
+      .eq("public_access", true)
       .limit(1);
 
     query = agentId ? query.eq("id", agentId) : query.eq("is_default", true);
