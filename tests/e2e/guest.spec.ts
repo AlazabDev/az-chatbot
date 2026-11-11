@@ -11,6 +11,7 @@ test("guest can open the help chat without Supabase authentication", async ({ pa
 });
 
 test("private agent cannot be invoked through public REST API", async ({ request }) => {
+  test.skip(!process.env.CHATBOT_E2E_URL, "Requires a configured staging Supabase connection");
   const res = await request.post("/api/public/agents/" + privateAgent, {
     data: { message: "test", visitorId },
     headers: { Origin: "http://127.0.0.1:4173" },
