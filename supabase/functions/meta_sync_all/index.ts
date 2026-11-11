@@ -213,10 +213,10 @@ Deno.serve(async (req) => {
         for (const t of templatesRes.data || []) {
           try {
             const category = categoryMap[t.category] || "UTILITY";
-            const bodyComp = t.components?.find((c: { type?: string; text?: string; example?: { body_text?: string[][] } }) => c.type === "BODY");
+            const bodyComp = t.components?.find((c: { type?: string; text?: string; example?: { body_text?: string[][]; body_text_named_params?: Array<{ param_name: string; example: string }> } }) => c.type === "BODY");
             const bodyText = bodyComp?.text || "";
 
-            let variables: Array<{ key?: string; value?: string; [key: string]: unknown }> = [];
+            let variables: string[] | Array<{ param_name: string; example: string }> = [];
             if (bodyComp?.example?.body_text?.[0]) {
               variables = bodyComp.example.body_text[0];
             } else if (bodyComp?.example?.body_text_named_params) {
