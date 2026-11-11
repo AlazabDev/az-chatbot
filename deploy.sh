@@ -1,96 +1,96 @@
 #!/usr/bin/env bash
-# AZ-Chatbot | GitHub -> Nitro Node -> PM2 -> Nginx -> HTTPS
-# Domain: bot.alazab.com | commands: deploy, rollback, status, logs, startup
+# AZ-Chatbot deploy: existing /mnt/ai/az-chatbot checkout -> Nitro Node -> PM2
+# Domain: bot.alazab.com (reverse proxy is managed independently)
 set -Eeuo pipefail
 umask 027
 
-DOMAIN="${DOMAIN:-bot.alazab.com}"
-REPOSITORY="${REPOSITORY:-https://github.com/AlazabDev/az-chatbot.git}"
-REF="${REF:-main}"
-APP_HOME="${APP_HOME:-/opt/alazab/bot}"
-ENV_FILE="${ENV_FILE:-/etc/alazab/bot.env}"
-APP_USER="${APP_USER:-azbot}"
+PROJECT_DIR="${PROJECT_DIR:-/mnt/ai/az-chatbot}"
+DOMAIN="bot.alazab.com"
 APP_NAME="${APP_NAME:-alazab-bot}"
 APP_PORT="${APP_PORT:-3100}"
 PROBE_PORT="${PROBE_PORT:-3199}"
-KEEP_RELEASES="${KEEP_RELEASES:-5}"
-CERT_EMAIL="${CERT_EMAIL:-}"
+REF="${REF:-origin/main}"
+KEEP_RELEASES="${KEEP_RELEASES:-4}"
 MODE="${1:-deploy}"
-RELEASES="$APP_HOME/releases"
-CURRENT="$APP_HOME/current"
-PREVIOUS="$APP_HOME/previous"
-RUNNER="$APP_HOME/run-live.sh"
-NGINX_CONFIG="/etc/nginx/sites-available/$APP_NAME.conf"
-NGINX_LINK="/etc/nginx/sites-enabled/$APP_NAME.conf"
-WEBROOT="/var/www/letsencrypt"
-TMP=""; NEW_RELEASE=""; OLD_CURRENT=""; SWITCHED=0; PROBE_NAME=""
+DEPLOY_DIR="$PROJECT_DIR/.deploy"
+RELEASES="$DEPLOY_DIR/releases"
+CURRENT="$DEPLOY_DIR/current"
+PREVIOUS="$DEPLOY_DIR/previous"
+BUILD_DIR=""
+PROBE_NAME=""
+NEW_RELEASE=""
+OLD_RELEASE=""
+SWITCHED=0
 
-log() { printf '[%s] %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"; }
-die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-need() { command -v "$1" >/dev/null 2>&1 || die "Missing command: $1"; }
-valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && ((10#$1 >= 1024 && 10#$1 <= 65535)); }
-link_target() { readlink -f -- "$1" 2>/dev/null || true; }
+log() { printf '[AZ-BOT %s] %s\n' "$(date -u +'%F %T UTC')" "$*"; }
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+require() { command -v "$1" >/dev/null 2>&1 || fail "Command not installed: $1"; }
+link_target() { readlink -f "$1" 2>/dev/null || true; }
 health() {
-  local port="$1" tries="${2:-20}" response
-  for ((n=1;n<=tries;n++)); do
-    response="$(curl --silent --show-error --fail --max-time 4 "http://127.0.0.1:${port}/api/health" 2>/dev/null || true)"
-    [[ "$response" == *'"status":"ok"'* ]] && return 0
+  local port="$1" count="${2:-25}" i body
+  for ((i=1;i<=count;i++)); do
+    body="$(curl -fsS --connect-timeout 2 --max-time 4 "http://127.0.0.1:${port}/api/health" 2>/dev/null || true)"
+    if [[ "$body" == *'"status":"ok"'* ]]; then return 0; fi
     sleep 2
   done
   return 1
 }
 
-[[ "$EUID" -eq 0 ]] || die 'Run as root with sudo on the Ubuntu hosting server.'
-if grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null && [[ "${ALLOW_WSL_DEPLOY:-0}" != '1' ]]; then
-  die 'WSL workstation detected. Execute on actual Ubuntu host, or set ALLOW_WSL_DEPLOY=1 only if WSL intentionally hosts the website.'
-fi
-[[ "$DOMAIN" == 'bot.alazab.com' ]] || die 'This release script supports bot.alazab.com only.'
-[[ "$APP_NAME" =~ ^[a-zA-Z0-9_-]+$ && "$APP_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || die 'Invalid app name or user.'
-[[ "$REF" =~ ^[a-zA-Z0-9._/-]+$ && "$REF" != -* ]] || die 'Invalid git ref.'
-[[ "$APP_HOME" == /* && "$APP_HOME" != / && "$APP_HOME" != *'..'* ]] || die 'Unsafe APP_HOME.'
-[[ "$ENV_FILE" == /* && "$ENV_FILE" != *'..'* ]] || die 'Unsafe ENV_FILE.'
-valid_port "$APP_PORT" && valid_port "$PROBE_PORT" && [[ "$APP_PORT" != "$PROBE_PORT" ]] || die 'Invalid or duplicate app ports.'
-[[ "$KEEP_RELEASES" =~ ^[1-9][0-9]*$ ]] || die 'KEEP_RELEASES must be a positive integer.'
-need node; need pm2; need runuser; need curl; need readlink
-NODE_BIN="$(command -v node)"; PM2_BIN="$(command -v pm2)"
-NODE_PATH="$(dirname "$NODE_BIN")"
-# Never run the PM2 daemon as root. Its persistent HOME is managed by azbot.
-if ! id "$APP_USER" >/dev/null 2>&1; then
-  [[ "$MODE" == deploy || "$MODE" == startup ]] || die 'App user has not been created yet.'
-  need useradd
-  useradd --system --create-home --shell /usr/sbin/nologin "$APP_USER"
-fi
-APP_USER_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
-[[ -n "$APP_USER_HOME" ]] || die 'Cannot resolve app user home.'
-PM2_HOME="$APP_USER_HOME/.pm2"
-install -d -m 0700 -o "$APP_USER" -g "$APP_USER" "$PM2_HOME"
-app_pm2() {
-  runuser -u "$APP_USER" -- env \
-    HOME="$APP_USER_HOME" PM2_HOME="$PM2_HOME" \
-    PATH="$NODE_PATH:/usr/local/bin:/usr/bin:/bin" \
-    "$PM2_BIN" "$@"
-}
-runuser -u "$APP_USER" -- "$NODE_BIN" --version >/dev/null 2>&1 || die "Node is inaccessible to $APP_USER: $NODE_BIN. Install system-wide Node rather than root-only nvm."
-app_pm2 --version >/dev/null 2>&1 || die "PM2 is inaccessible to $APP_USER. Install PM2 system-wide: sudo npm install -g pm2"
+# PM2 always runs as the invoking unprivileged user; do not create root PM2 state.
+[[ "${EUID}" -ne 0 ]] || fail 'Do not use sudo for PM2 deploy. Run as the app owner.'
+[[ "$PROJECT_DIR" == /mnt/ai/az-chatbot ]] || fail 'Unexpected project path; expected /mnt/ai/az-chatbot.'
+[[ "$APP_NAME" =~ ^[a-zA-Z0-9._-]+$ ]] || fail 'Invalid APP_NAME.'
+[[ "$APP_PORT" =~ ^[0-9]+$ && "$PROBE_PORT" =~ ^[0-9]+$ ]] || fail 'Invalid ports.'
+(( APP_PORT >= 1024 && APP_PORT <= 65535 && PROBE_PORT >= 1024 && PROBE_PORT <= 65535 )) || fail 'Port out of range.'
+[[ "$APP_PORT" != "$PROBE_PORT" ]] || fail 'Live and probe ports cannot be equal.'
+[[ "$KEEP_RELEASES" =~ ^[1-9][0-9]*$ ]] || fail 'KEEP_RELEASES must be a positive integer.'
+require git; require node; require bun; require pm2; require curl; require readlink
+[[ -d "$PROJECT_DIR/.git" || -f "$PROJECT_DIR/.git" ]] || fail "Git repository missing: $PROJECT_DIR"
+[[ -w "$PROJECT_DIR" ]] || fail "Project directory isn't writable: $PROJECT_DIR"
+mkdir -p "$RELEASES"
 
-check_env() {
-  [[ -f "$ENV_FILE" ]] || die "Missing $ENV_FILE. Copy bot-alazab.env.example and supply actual credentials."
-  [[ "$(stat -c '%u' "$ENV_FILE")" == 0 ]] || die 'Environment file must be owned by root.'
-  # A dedicated runtime group is allowed to read the secrets; world access is denied.
-  chgrp "$APP_USER" "$ENV_FILE"
-  chmod 0640 "$ENV_FILE"
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
-  local key
-  for key in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY THREAD_SIGNING_SECRET CHAT_GATEWAY_HASH_SECRET FOUNDRY_PROJECT_ENDPOINT FOUNDRY_INPUT_COST_PER_1M_TOKENS FOUNDRY_OUTPUT_COST_PER_1M_TOKENS CHAT_DAILY_BUDGET_USD; do
-    [[ -n "${!key:-}" ]] || die "Missing $key in $ENV_FILE"
-    [[ "${!key}" != REPLACE_* ]] || die "Placeholder remains for $key in $ENV_FILE"
-  done
-  [[ "${#THREAD_SIGNING_SECRET}" -ge 32 && "${#CHAT_GATEWAY_HASH_SECRET}" -ge 32 ]] || die 'Signing keys must be >= 32 chars.'
-  [[ -n "${FOUNDRY_ACCESS_TOKEN:-}" || ( -n "${FOUNDRY_TENANT_ID:-}" && -n "${FOUNDRY_CLIENT_ID:-}" && -n "${FOUNDRY_CLIENT_SECRET:-}" ) ]] || die 'Missing Foundry Entra credentials.'
-  for key in FOUNDRY_INPUT_COST_PER_1M_TOKENS FOUNDRY_OUTPUT_COST_PER_1M_TOKENS CHAT_DAILY_BUDGET_USD; do
-    [[ "${!key}" =~ ^[0-9]+([.][0-9]+)?$ && "${!key}" != 0 && "${!key}" != 0.0 ]] || die "Invalid positive USD rate: $key"
-  done
-}
+# Never fetch, build, or alter the live tree for read-only commands.
+case "$MODE" in
+  status)
+    pm2 describe "$APP_NAME" || true
+    printf '\nLocal /api/health: '
+    curl -fsS --max-time 6 "http://127.0.0.1:${APP_PORT}/api/health" || true
+    printf '\nCurrent release: %s\n' "$(link_target "$CURRENT")"
+    exit 0 ;;
+  logs) pm2 logs "$APP_NAME" --lines 100 --nostream; exit 0 ;;
+  rollback)
+    [[ -L "$PREVIOUS" ]] || fail 'No previous release available.'
+    new_target="$(link_target "$PREVIOUS")"
+    [[ -f "$new_target/server/index.mjs" ]] || fail 'Saved release is not executable.'
+    old_target="$(link_target "$CURRENT")"
+    # Do not replace PM2 until we have confirmed the old build exists.
+    pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+    ln -sfn "$new_target" "$CURRENT.next"; mv -Tf "$CURRENT.next" "$CURRENT"
+    HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT="$APP_PORT" NITRO_PORT="$APP_PORT" NODE_ENV=production \
+      pm2 start "$CURRENT/server/index.mjs" --name "$APP_NAME" --interpreter "$(command -v node)" --cwd "$CURRENT" --time
+    if ! health "$APP_PORT" 25; then
+      pm2 logs "$APP_NAME" --lines 40 --nostream >&2 || true
+      if [[ -f "$old_target/server/index.mjs" ]]; then
+        pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+        ln -sfn "$old_target" "$CURRENT.next"; mv -Tf "$CURRENT.next" "$CURRENT"
+        HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT="$APP_PORT" NITRO_PORT="$APP_PORT" NODE_ENV=production \
+          pm2 start "$CURRENT/server/index.mjs" --name "$APP_NAME" --interpreter "$(command -v node)" --cwd "$CURRENT" --time || true
+      fi
+      fail 'Rollback health check failed. Attempted restoration of original release.'
+    fi
+    [[ -n "$old_target" && -d "$old_target" ]] && { ln -sfn "$old_target" "$PREVIOUS.next"; mv -Tf "$PREVIOUS.next" "$PREVIOUS"; }
+    pm2 save --force >/dev/null
+    log "Rollback OK -> $(link_target "$CURRENT")"
+    exit 0 ;;
+  deploy) ;;
+  *) fail 'Usage: bash deploy-bot-pm2.sh [deploy|status|logs|rollback]' ;;
+esac
+
+cleanup() {
+  local exit_status="$?"
+  trap - EXIT
+  if [[ -n "$PROBE_NAME" ]]; then pm2 delete "$PROBE_NAME" >/dev/null 2>&1 || true; fi
+  if [[ -n "$BUILD_DIR" && -d "$BUILD_DIR/src" ]]; then
+    git -C "$PROJECT_DIR" worktree remove --force "$BUILD_DIR/src" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$BUILD_DIR" && -d "$BUILD_DIR" ]]; then rm -rf -- "$BUILD_DIR"; fi
