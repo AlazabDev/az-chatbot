@@ -275,6 +275,6 @@ Deno.serve(async (req) => {
     return json(results);
   } catch (err: unknown) {
     console.error("meta_sync_all error:", err);
-    return json({ error: err?.message || String(err) }, 500);
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
