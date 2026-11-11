@@ -99,9 +99,11 @@ export class GeminiClient {
     ];
     const validUrgency: UrgencyLevel[] = ["normal", "urgent", "emergency"];
 
+    const issueType = analysis.issue_type;
+    const urgency = analysis.urgency;
     return {
-      issue_type: validIssueTypes.includes(analysis.issue_type) ? analysis.issue_type : "other",
-      urgency: validUrgency.includes(analysis.urgency) ? analysis.urgency : "normal",
+      issue_type: issueType && validIssueTypes.includes(issueType) ? issueType : "other",
+      urgency: urgency && validUrgency.includes(urgency) ? urgency : "normal",
       description: analysis.description || "لم يتم تحديد وصف للعطل",
       confidence: Math.min(Math.max(analysis.confidence || 0.7, 0), 1),
       possible_causes: analysis.possible_causes || [],
