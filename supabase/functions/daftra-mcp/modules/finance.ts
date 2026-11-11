@@ -2,6 +2,36 @@
 // موديول الحسابات العامة والمالية: القيود اليومية، دليل الحسابات، المصروفات، الإيرادات، والخزائن
 import { callDaftraApi } from "../daftra-client.ts";
 
+type JournalTransaction = { journal_account_id: number; currency_debit?: number; currency_credit?: number; description?: string };
+/** Typed arguments from this module's Daftra tool input schemas. */
+type ToolArgs = {
+  page?: number;
+  limit?: number;
+  draft?: number;
+  journal_id?: number;
+  confirm?: boolean;
+  transactions: JournalTransaction[];
+  date?: string;
+  description?: string;
+  currency_code?: string;
+  journal_cat_id?: number;
+  name?: string;
+  code?: string;
+  type?: number | string;
+  treasury_id?: number;
+  client_id?: number;
+  supplier_id?: number;
+  amount?: number;
+  category?: string;
+  journal_account_id?: number;
+  note?: string;
+  vendor?: string;
+  work_order_id?: number;
+  type_name?: string;
+  type_account_number?: string;
+};
+
+
 export const financeTools = [
   // ==========================================
   // 1. قيود اليومية - استعراض (List Journals)
@@ -17,7 +47,7 @@ export const financeTools = [
         draft: { type: "number", description: "حالة القيد: 0 للقيود المعتمدة (Issued)، 1 للمسودات (Draft)" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       const queryParams: Record<string, string | number> = {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -40,7 +70,7 @@ export const financeTools = [
       },
       required: ["journal_id"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", `journals/${args.journal_id}.json`);
     }
   },
@@ -76,14 +106,14 @@ export const financeTools = [
       },
       required: ["transactions", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("إنشاء قيد يومية يتطلب تأكيداً صريحاً بتمرير confirm=true.");
       }
 
       // التحقق السريع من توازن القيد
-      const totalDebit = args.transactions.reduce((acc: number, t: any) => acc + (t.currency_debit || 0), 0);
-      const totalCredit = args.transactions.reduce((acc: number, t: any) => acc + (t.currency_credit || 0), 0);
+      const totalDebit = args.transactions.reduce((acc: number, t: JournalTransaction) => acc + (t.currency_debit || 0), 0);
+      const totalCredit = args.transactions.reduce((acc: number, t: JournalTransaction) => acc + (t.currency_credit || 0), 0);
       if (Math.abs(totalDebit - totalCredit) > 0.01) {
         throw new Error(`القيد غير متزن! إجمالي المدين (${totalDebit}) لا يساوي إجمالي الدائن (${totalCredit}).`);
       }
@@ -95,7 +125,7 @@ export const financeTools = [
           currency_code: args.currency_code,
           draft: args.draft || 0
         },
-        JournalTransaction: args.transactions.map((t: any) => ({
+        JournalTransaction: args.transactions.map((t: JournalTransaction) => ({
           journal_account_id: t.journal_account_id,
           currency_debit: t.currency_debit || 0,
           currency_credit: t.currency_credit || 0,
@@ -121,7 +151,7 @@ export const financeTools = [
         journal_cat_id: { type: "number", description: "فلترة حسب المجلد/الفئة الرئيسية للحساب" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "journal_accounts.json", undefined, {
         page: args.page || 1,
         limit: args.limit || 50,
@@ -147,7 +177,7 @@ export const financeTools = [
       },
       required: ["name", "code", "journal_cat_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("إضافة حساب في الدليل تتطلب تأكيداً بتمرير confirm=true.");
       }
@@ -179,7 +209,7 @@ export const financeTools = [
         supplier_id: { type: "number", description: "فلترة حسب المورد" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "expenses.json", undefined, {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -213,7 +243,7 @@ export const financeTools = [
       },
       required: ["amount", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("تسجيل سند صرف يتطلب تأكيداً صريحاً بتمرير confirm=true.");
       }
@@ -249,7 +279,7 @@ export const financeTools = [
         treasury_id: { type: "number", description: "فلترة بحسب الخزينة أو الحساب البنكي المودع به" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "incomes.json", undefined, {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -279,7 +309,7 @@ export const financeTools = [
       },
       required: ["amount", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("تسجيل إيراد يتطلب تأكيداً بتمرير confirm=true.");
       }
@@ -312,7 +342,7 @@ export const financeTools = [
         limit: { type: "number", description: "الحد الأقصى" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "treasuries.json", undefined, {
         page: args.page || 1,
         limit: args.limit || 20
@@ -339,7 +369,7 @@ export const financeTools = [
       },
       required: ["name", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("إضافة خزينة أو حساب بنكي تتطلب تأكيداً بتمرير confirm=true.");
       }

@@ -191,9 +191,9 @@ async function runFoundryAgent(prompt: string): Promise<FinanceExtraction> {
   }
 
   const list = await listResponse.json();
-  const assistantMessage = (list.data ?? []).find((message: any) => message.role === "assistant");
+  const assistantMessage = (list.data ?? []).find((message: { role?: string; content?: Array<{ text?: string | { value?: string } }> }) => message.role === "assistant");
   const text = (assistantMessage?.content ?? [])
-    .map((content: any) => content?.text?.value ?? content?.text ?? "")
+    .map((content: { text?: string | { value?: string } }) => typeof content?.text === "string" ? content.text : content?.text?.value ?? "")
     .join("\n");
 
   return normalize(parseJson(text), "foundry");

@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const accountId = typeof body.account_id === "string" ? body.account_id : null;
     if (!["submit", "sync", "delete"].includes(action)) return json({ error: "invalid action" }, 400);
 
-    let tpl: Record<string, any> | null = null;
+    let tpl: { id: string; account_id?: string; name: string; language: string; category?: string; components?: unknown } | null = null;
     if (templateId) {
       const { data } = await admin.from("message_templates").select("*").eq("id", templateId).eq("user_id", userId).maybeSingle();
       if (!data) return json({ error: "القالب غير موجود" }, 404);
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
       const { data: local } = await admin.from("message_templates").select("id,name,language").eq("user_id", userId).eq("account_id", acc.id);
       let updated = 0;
       for (const t of local ?? []) {
-        const remote = (out.data ?? []).find((r: any) => r.name === t.name && r.language === t.language);
+        const remote = (out.data ?? []).find((r: { name: string; language: string; status?: string; id?: string; rejected_reason?: string }) => r.name === t.name && r.language === t.language);
         if (!remote) continue;
         await admin.from("message_templates").update({
           status: remote.status, meta_template_id: remote.id,

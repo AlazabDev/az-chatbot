@@ -2,6 +2,38 @@
 // تغطية شاملة لكافة عمليات أوامر العمل والمواعيد وربط الفواتير في دفترة
 import { callDaftraApi } from "../daftra-client.ts";
 
+/** Typed arguments from this module's Daftra tool input schemas. */
+type ToolArgs = {
+  page?: number;
+  limit?: number;
+  status?: string | number;
+  work_order_id?: number;
+  confirm?: boolean;
+  title?: string;
+  client_id?: number;
+  number?: string;
+  start_date?: string;
+  delivery_date?: string;
+  description?: string;
+  budget?: number;
+  budget_currency?: string;
+  staff_id?: number;
+  follow_up_status_id?: number;
+  delivery_appointment_id?: number;
+  is_draft?: number;
+  invoice_id?: number;
+  partner_id?: number;
+  status_id?: number;
+  appointment_id?: number;
+  date?: string;
+  end_date?: string;
+  duration?: string;
+  body?: string;
+  action_id?: number;
+  share_with_partner?: boolean;
+};
+
+
 export const workOrderTools = [
   // ==========================================
   // 1. استعراض أوامر العمل (GET All Work Orders)
@@ -20,7 +52,7 @@ export const workOrderTools = [
         }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       const queryParams: Record<string, string | number> = {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -45,7 +77,7 @@ export const workOrderTools = [
       },
       required: ["work_order_id"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", `work_orders/${args.work_order_id}.json`);
     }
   },
@@ -75,7 +107,7 @@ export const workOrderTools = [
       },
       required: ["title", "client_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("إنشاء أمر العمل يتطلب تأكيداً صريحاً بتمرير confirm=true.");
       }
@@ -122,7 +154,7 @@ export const workOrderTools = [
       },
       required: ["work_order_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("تعديل أمر العمل يتطلب تأكيداً صريحاً بتمرير confirm=true.");
       }
@@ -154,7 +186,7 @@ export const workOrderTools = [
       },
       required: ["work_order_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("حذف أمر العمل يتطلب تأكيداً صريحاً بتمرير confirm=true لتفادي فقد البيانات.");
       }
@@ -180,7 +212,7 @@ export const workOrderTools = [
       },
       required: ["invoice_id", "work_order_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("ربط أمر العمل بالفاتورة يتطلب تأكيداً بتمرير confirm=true.");
       }
@@ -212,7 +244,7 @@ export const workOrderTools = [
         limit: { type: "number", description: "عدد العناصر" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       const queryParams: Record<string, string | number> = {
         page: args.page || 1,
         limit: args.limit || 20
@@ -238,7 +270,7 @@ export const workOrderTools = [
       },
       required: ["appointment_id"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", `work_order_appointments/${args.appointment_id}.json`);
     }
   },
@@ -264,7 +296,7 @@ export const workOrderTools = [
       },
       required: ["work_order_id", "date", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("إضافة موعد لأمر العمل تتطلب تأكيداً بتمرير confirm=true.");
       }
@@ -304,7 +336,7 @@ export const workOrderTools = [
       },
       required: ["appointment_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("تعديل موعد أمر العمل يتطلب تأكيداً بتمرير confirm=true.");
       }
@@ -333,7 +365,7 @@ export const workOrderTools = [
       },
       required: ["appointment_id", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("حذف الموعد يتطلب تأكيداً بتمرير confirm=true.");
       }

@@ -127,9 +127,29 @@ Deno.serve(async (req) => {
   }
 });
 
+type WorkerClient = ReturnType<typeof createClient>;
+type WorkerPayload = {
+  webhook_endpoint_id?: string; event_type?: string; payload?: unknown;
+  media_id?: string; tenant_id?: string; message_id?: string; mime_type?: string;
+  conversation_id?: string; wa_account_id?: string; text?: string;
+  template?: { name?: string; language?: { code?: string }; components?: unknown };
+};
+type WorkerJob = {
+  id: number; tenant_id?: string; job_type: string; attempts: number;
+  max_attempts?: number; payload: WorkerPayload;
+};
+type WorkflowRunAction = { action: string; status: string; error?: string };
+type TemplateComponent = { type?: string; text?: string; example?: { body_text?: string[][] } };
+type OutboundWaPayload = {
+  messaging_product: "whatsapp"; to: string | undefined;
+  type?: "text" | "template";
+  template?: WorkerPayload["template"];
+  text?: { body: string };
+};
+
 // ========== Job Handlers ==========
 
-async function processWebhookDelivery(supabase: any, job: any) {
+async function processWebhookDelivery(supabase: WorkerClient, job: WorkerJob) {
   const { webhook_endpoint_id, event_type, payload } = job.payload;
 
   const { data: ep } = await supabase
@@ -164,7 +184,7 @@ async function processWebhookDelivery(supabase: any, job: any) {
   }
 }
 
-async function processMedia(supabase: any, job: any) {
+async function processMedia(supabase: WorkerClient, job: WorkerJob) {
   const { media_id, tenant_id, message_id, mime_type } = job.payload;
   const waAccessToken = requireMetaAccessToken();
   const apiVersion = getMetaApiVersion();
@@ -334,7 +354,7 @@ async function processMedia(supabase: any, job: any) {
   }
 }
 
-async function processWorkflow(supabase: any, job: any) {
+async function processWorkflow(supabase: WorkerClient, job: WorkerJob) {
   const { tenant_id, message_id, conversation_id } = job.payload;
 
   // Get enabled workflows for this tenant
@@ -379,7 +399,7 @@ async function processWorkflow(supabase: any, job: any) {
     if (!conditionsMet) continue;
 
     // Execute actions
-    const runLog: any[] = [];
+    const runLog: WorkflowRunAction[] = [];
 
     for (const action of rules.actions) {
       try {
@@ -448,7 +468,7 @@ async function processWorkflow(supabase: any, job: any) {
   }
 }
 
-async function processTemplateSync(supabase: any, job: any) {
+async function processTemplateSync(supabase: WorkerClient, job: WorkerJob) {
   const { tenant_id, wa_account_id } = job.payload;
   const waAccessToken = requireMetaAccessToken();
   const apiVersion = getMetaApiVersion();
@@ -476,7 +496,7 @@ async function processTemplateSync(supabase: any, job: any) {
   };
 
   for (const t of result.data || []) {
-    const component = t.components?.find((c: any) => c.type === "BODY");
+    const component = t.components?.find((c: TemplateComponent) => c.type === "BODY");
     await supabase.from("templates").upsert(
       {
         tenant_id,
@@ -494,7 +514,7 @@ async function processTemplateSync(supabase: any, job: any) {
   }
 }
 
-async function processSendMessage(supabase: any, job: any) {
+async function processSendMessage(supabase: WorkerClient, job: WorkerJob) {
   const { tenant_id, conversation_id, text, template } = job.payload;
   const waAccessToken = requireMetaAccessToken();
   const apiVersion = getMetaApiVersion();
@@ -510,7 +530,7 @@ async function processSendMessage(supabase: any, job: any) {
   const recipientPhone = conv.contacts?.phone_e164?.replace("+", "");
   const phoneNumberId = conv.wa_numbers?.phone_number_id;
 
-  const waPayload: any = { messaging_product: "whatsapp", to: recipientPhone };
+  const waPayload: OutboundWaPayload = { messaging_product: "whatsapp", to: recipientPhone };
   if (template) {
     waPayload.type = "template";
     waPayload.template = template;

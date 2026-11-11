@@ -11,7 +11,7 @@ export interface AnalysisResult {
   suggested_action: string;
   detected_objects: string[];
   severity_score: number; // 0-1
-  raw_response: any;
+  raw_response: unknown;
 }
 
 export interface ImageAnalysisRequest {

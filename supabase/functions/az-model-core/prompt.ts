@@ -11,7 +11,7 @@ export interface AgentConfig {
   role: string;
   systemPrompt: string;
   temperature?: number;
-  tools?: any[];
+  tools?: Array<{ type: string; function?: { name: string; description?: string; parameters?: Record<string, unknown> } }>;
 }
 
 export const AGENT_CONFIGS: Record<string, AgentConfig> = {

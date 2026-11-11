@@ -1,6 +1,22 @@
 // modules/invoices.ts
 import { callDaftraApi } from "../daftra-client.ts";
 
+type InvoiceLine = { item_id?: number; item?: string; unit_price: number; quantity: number; tax1?: number };
+/** Typed arguments from this module's Daftra tool input schemas. */
+type ToolArgs = {
+  page?: number;
+  limit?: number;
+  client_id?: number;
+  status?: string;
+  invoice_id?: number;
+  confirm?: boolean;
+  date?: string;
+  currency_code?: string;
+  notes?: string;
+  items: InvoiceLine[];
+};
+
+
 export const invoiceTools = [
   {
     name: "daftra_list_invoices",
@@ -14,7 +30,7 @@ export const invoiceTools = [
         status: { type: "string", description: "حالة الفاتورة (draft, paid, unpaid, partially_paid)" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "invoice", undefined, {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -33,7 +49,7 @@ export const invoiceTools = [
       },
       required: ["invoice_id"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", `invoice/${args.invoice_id}`);
     }
   },
@@ -66,7 +82,7 @@ export const invoiceTools = [
       },
       required: ["client_id", "items", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("عملية إنشاء فاتورة تتطلب موافقة وتمرير confirm=true صراحة.");
       }
@@ -77,7 +93,7 @@ export const invoiceTools = [
           currency_code: args.currency_code,
           notes: args.notes
         },
-        InvoiceItem: args.items.map((it: any) => ({
+        InvoiceItem: args.items.map((it: JournalTransaction) => ({
           item_id: it.item_id,
           item: it.item,
           unit_price: it.unit_price,

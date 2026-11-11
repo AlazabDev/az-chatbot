@@ -38,7 +38,7 @@ async function resolveWaToken(waNumberId?: string | null) {
       .select("meta")
       .eq("id", waNumberId)
       .maybeSingle();
-    const secretName = (data?.meta as any)?.token_secret as string | undefined;
+    const secretName = (data?.meta as { token_secret?: string } | null)?.token_secret as string | undefined;
     if (secretName) {
       const scoped = Deno.env.get(secretName);
       if (scoped) return scoped;
@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!leased) return json({ skipped: true, reason: "lease not acquired" });
 
-  const results: any[] = [];
+  const results: Array<{ id?: string; status?: string; error?: string; [key: string]: unknown }> = [];
   let paused: string | null = null;
   let rateLimited = 0;
 
@@ -274,7 +274,7 @@ Deno.serve(async (req) => {
             status: "done",
             ocr_text: vision.ocrText,
             vision_result: { caption: vision.caption, tags: vision.tags },
-            agent_result: extraction as any,
+            agent_result: extraction as unknown as Record<string, unknown>,
             doc_type: extraction.doc_type,
             vendor: extraction.vendor,
             invoice_number: extraction.invoice_number,
@@ -298,7 +298,7 @@ Deno.serve(async (req) => {
       } catch (e) {
         const msg = (e as Error).message ?? String(e);
         const status =
-          (e as any).status ??
+          (e as { status?: number }).status ??
           (msg.match(/\b(402|403|429)\b/)?.[1] ? Number(msg.match(/\b(402|403|429)\b/)![1]) : 0);
         if (status === 402 || status === 403) paused = msg;
         if (status === 429) rateLimited++;
@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const batchIds = [...new Set((docs ?? []).map((d: any) => d.batch_id).filter(Boolean))];
+    const batchIds = [...new Set((docs ?? []).map((d: { batch_id?: string | null }) => d.batch_id).filter(Boolean))];
     for (const id of batchIds) await rollupBatch(tenantId, id as string);
 
     if (paused || rateLimited >= 3) {

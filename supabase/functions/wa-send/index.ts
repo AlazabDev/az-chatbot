@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
   if (claimsErr || !claims?.claims?.sub) return json({ error: "Unauthorized" }, 401);
   const userId = claims.claims.sub;
 
-  let body: any;
+  let body: { wa_number_id?: string; to?: string; type?: string; text?: string; template?: { name?: string; language?: { code?: string }; components?: unknown }; media?: { link?: string; caption?: string; filename?: string }; reaction?: { message_id?: string; emoji?: string }; context?: { message_id?: string } };
   try {
     body = await req.json();
   } catch {
@@ -59,13 +59,13 @@ Deno.serve(async (req) => {
   if (!member || !["operator", "admin"].includes(String(member.role)))
     return json({ error: "Forbidden" }, 403);
 
-  const tokenSecretName = (num.meta as any)?.token_secret as string | undefined;
+  const tokenSecretName = (num.meta as { token_secret?: string } | null)?.token_secret as string | undefined;
   const waToken = (tokenSecretName ? Deno.env.get(tokenSecretName) : "") || DEFAULT_WA_TOKEN;
   if (!waToken) return json({ error: "WhatsApp token not configured for this number" }, 503);
 
   const toPhone = String(to).replace(/[^0-9]/g, "");
   if (!/^\d{8,15}$/.test(toPhone)) return json({ error: "Invalid destination phone" }, 400);
-  const waPayload: any = { messaging_product: "whatsapp", to: toPhone, type };
+  const waPayload: { messaging_product: string; to: string; type: string; text?: { body: string; preview_url: boolean }; template?: unknown; image?: unknown; video?: unknown; audio?: unknown; document?: unknown; sticker?: unknown; reaction?: unknown; context?: unknown; [key: string]: unknown } = { messaging_product: "whatsapp", to: toPhone, type };
 
   if (type === "text") {
     const value = String(text ?? "").trim();
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
   } else if (MEDIA_TYPES.has(type)) {
     if (!media?.link || !/^https:\/\//i.test(media.link))
       return json({ error: "HTTPS media link required" }, 400);
-    const m: any = { link: media.link };
+    const m: { link: string; caption?: string; filename?: string } = { link: media.link };
     if (media.caption && type !== "audio" && type !== "sticker") m.caption = media.caption;
     if (type === "document" && media.filename) m.filename = media.filename;
     waPayload[type] = m;

@@ -1,6 +1,22 @@
 // modules/clients.ts
 import { callDaftraApi } from "../daftra-client.ts";
 
+/** Typed arguments from this module's Daftra tool input schemas. */
+type ToolArgs = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  client_id?: number;
+  confirm?: boolean;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone1?: string;
+  address1?: string;
+  tax_number?: string;
+};
+
+
 export const clientTools = [
   {
     name: "daftra_list_clients",
@@ -13,7 +29,7 @@ export const clientTools = [
         search: { type: "string", description: "كلمة البحث (اسم العميل، الهاتف، البريد، الرقم الضريبي)" }
       }
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", "client", undefined, {
         page: args.page || 1,
         limit: args.limit || 20,
@@ -31,7 +47,7 @@ export const clientTools = [
       },
       required: ["client_id"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       return await callDaftraApi("GET", `client/${args.client_id}`);
     }
   },
@@ -51,7 +67,7 @@ export const clientTools = [
       },
       required: ["first_name", "confirm"]
     },
-    handler: async (args: any) => {
+    handler: async (args: ToolArgs) => {
       if (!args.confirm) {
         throw new Error("إضافة عميل تتطلب موافقة صريحة عبر تمرير confirm=true.");
       }

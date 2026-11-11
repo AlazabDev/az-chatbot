@@ -53,7 +53,7 @@ export function buildOpenAIHeaders(apiKey: string, clientRequestId?: string): He
   return headers;
 }
 
-export function extractOpenAIText(responseJson: any): string {
+export function extractOpenAIText(responseJson: { output_text?: string; output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }> } | null): string {
   if (typeof responseJson?.output_text === "string" && responseJson.output_text.trim()) {
     return responseJson.output_text.trim();
   }

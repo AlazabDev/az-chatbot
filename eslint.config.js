@@ -36,13 +36,6 @@ export default tseslint.config(
     },
   },
   {
-    // Legacy Supabase Edge handlers run under Deno and are not part of tsconfig's
-    // React app. Keep existing explicit-any technical debt visible as warnings
-    // instead of disabling linting across the repository.
-    files: ["supabase/functions/**/*.{ts,tsx}"],
-    rules: { "@typescript-eslint/no-explicit-any": "warn" },
-  },
-  {
     // Generated Radix/shadcn UI exports both components and reusable helpers.
     files: ["src/components/ui/**/*.{ts,tsx}", "src/contexts/auth-context.tsx"],
     rules: { "react-refresh/only-export-components": "off" },

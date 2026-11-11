@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
 
     if (!conv) return json({ error: "Conversation not found" }, 404);
 
-    const recipientPhone = (conv as any).contacts?.phone_e164?.replace("+", "");
-    const phoneNumberId = (conv as any).wa_numbers?.phone_number_id;
+    const recipientPhone = (conv as typeof conv & { contacts?: { phone_e164?: string } }).contacts?.phone_e164?.replace("+", "");
+    const phoneNumberId = (conv as typeof conv & { wa_numbers?: { phone_number_id?: string } }).wa_numbers?.phone_number_id;
     const waAccessToken = requireMetaAccessToken();
     const apiVersion = getMetaApiVersion();
 

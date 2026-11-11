@@ -62,8 +62,8 @@ Deno.serve(async (req) => {
     }
 
     return json({ success: true, data });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("diagnose_number error:", err);
-    return json({ success: false, error: err.message }, 200);
+    return json({ success: false, error: err instanceof Error ? err.message : String(err) }, 200);
   }
 });

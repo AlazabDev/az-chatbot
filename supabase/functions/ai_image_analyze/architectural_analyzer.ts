@@ -1,4 +1,5 @@
 import { GeminiClient } from "./gemini.client.ts";
+import type { AnalysisResult } from "./types.ts";
 import {
   ARCHITECTURAL_SYSTEM_PROMPT,
   getArchitecturalImagePrompt,
@@ -84,7 +85,7 @@ export class ArchitecturalAnalyzer {
   /**
    * إثراء التحليل بمعلومات إضافية
    */
-  private enrichAnalysis(analysis: any, options: any): ArchitecturalAnalysis {
+  private enrichAnalysis(analysis: AnalysisResult & { immediate_action?: string; estimated_time?: string; preventive_measures?: string }, options: { buildingType?: "residential" | "commercial" | "industrial" }): ArchitecturalAnalysis {
     return {
       ...analysis,
       metadata: {
@@ -105,7 +106,7 @@ export class ArchitecturalAnalyzer {
   /**
    * إنشاء توصيات مفصلة بناءً على التحليل
    */
-  private generateRecommendations(analysis: any): RepairRecommendation[] {
+  private generateRecommendations(analysis: AnalysisResult & { immediate_action?: string; estimated_time?: string; preventive_measures?: string }): RepairRecommendation[] {
     const recommendations: RepairRecommendation[] = [];
 
     // توصية فورية

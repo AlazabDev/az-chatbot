@@ -88,7 +88,7 @@ export class GeminiClient {
     return btoa(binary);
   }
 
-  private validateAnalysis(analysis: any): AnalysisResult {
+  private validateAnalysis(analysis: Partial<AnalysisResult>): AnalysisResult {
     const validIssueTypes: MaintenanceIssueType[] = [
       "plumbing",
       "electrical",

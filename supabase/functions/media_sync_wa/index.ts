@@ -35,7 +35,16 @@ async function fetchMediaBlob(url: string): Promise<ArrayBuffer | null> {
   return res.arrayBuffer();
 }
 
-function mimeToKind(mime: string): string {
+type MediaKind = "image" | "video" | "audio" | "document" | "sticker" | "other";
+type WaMediaMetadata = {
+  media_id?: string;
+  image?: { id?: string };
+  video?: { id?: string };
+  audio?: { id?: string };
+  document?: { id?: string };
+  sticker?: { id?: string };
+};
+function mimeToKind(mime: string): MediaKind {
   if (mime.startsWith("image/")) return "image";
   if (mime.startsWith("video/")) return "video";
   if (mime.startsWith("audio/")) return "audio";
@@ -122,7 +131,7 @@ Deno.serve(async (req) => {
       if (convIds && convIds.length > 0) {
         q = q.in(
           "conversation_id",
-          convIds.map((c: any) => c.id),
+          convIds.map((c: { id: string }) => c.id),
         );
       }
     }
@@ -150,7 +159,7 @@ Deno.serve(async (req) => {
       }
 
       // Get media ID from meta
-      const meta = msg.meta as any;
+      const meta = msg.meta as WaMediaMetadata | null;
       const waMediaId =
         meta?.media_id ||
         meta?.image?.id ||
@@ -199,7 +208,7 @@ Deno.serve(async (req) => {
         const { error: dbErr } = await serviceClient.from("media_files").insert({
           tenant_id: msg.tenant_id,
           message_id: msg.id,
-          kind: kind as any,
+          kind,
           mime: mediaMeta.mime,
           storage_bucket: "wa-media",
           storage_key: storageKey,
@@ -211,8 +220,8 @@ Deno.serve(async (req) => {
         } else {
           synced++;
         }
-      } catch (e: any) {
-        errors.push(`Error processing message ${msg.id}: ${e.message}`);
+      } catch (e: unknown) {
+        errors.push(`Error processing message ${msg.id}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -222,8 +231,8 @@ Deno.serve(async (req) => {
       errors: errors.length > 0 ? errors : undefined,
       message: `تمت مزامنة ${synced} ملف وسائط`,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("media_sync_wa error:", err);
-    return json({ error: err.message }, 500);
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
