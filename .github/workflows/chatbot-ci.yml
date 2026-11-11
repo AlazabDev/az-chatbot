@@ -27,6 +27,7 @@ jobs:
         with:
           name: chatbot-build-${{ github.sha }}
           path: .output/
+          include-hidden-files: true
           retention-days: 14
           if-no-files-found: error
       - name: TypeScript
