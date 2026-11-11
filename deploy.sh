@@ -36,8 +36,10 @@ health() {
   return 1
 }
 
-# PM2 always runs as the invoking unprivileged user; do not create root PM2 state.
-[[ "${EUID}" -ne 0 ]] || fail 'Do not use sudo for PM2 deploy. Run as the app owner.'
+# PM2 controls processes per Unix account. Root is intentionally supported on
+# azab-orchestrator, where the operator invokes this script as root.
+# Do not silently switch accounts: root PM2 and user PM2 are separate process lists.
+log "PM2 owner: $(id -un) (uid=$EUID), PM2_HOME=${PM2_HOME:-$HOME/.pm2}"
 [[ "$PROJECT_DIR" == /mnt/ai/az-chatbot ]] || fail 'Unexpected project path; expected /mnt/ai/az-chatbot.'
 [[ "$APP_NAME" =~ ^[a-zA-Z0-9._-]+$ ]] || fail 'Invalid APP_NAME.'
 [[ "$APP_PORT" =~ ^[0-9]+$ && "$PROBE_PORT" =~ ^[0-9]+$ ]] || fail 'Invalid ports.'
@@ -92,5 +94,3 @@ cleanup() {
   if [[ -n "$PROBE_NAME" ]]; then pm2 delete "$PROBE_NAME" >/dev/null 2>&1 || true; fi
   if [[ -n "$BUILD_DIR" && -d "$BUILD_DIR/src" ]]; then
     git -C "$PROJECT_DIR" worktree remove --force "$BUILD_DIR/src" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "$BUILD_DIR" && -d "$BUILD_DIR" ]]; then rm -rf -- "$BUILD_DIR"; fi
