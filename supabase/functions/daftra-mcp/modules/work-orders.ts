@@ -6,7 +6,7 @@ import { callDaftraApi } from "../daftra-client.ts";
 type ToolArgs = {
   page?: number;
   limit?: number;
-  status?: string;
+  status?: string | number;
   work_order_id?: number;
   confirm?: boolean;
   title?: string;
@@ -20,14 +20,14 @@ type ToolArgs = {
   staff_id?: number;
   follow_up_status_id?: number;
   delivery_appointment_id?: number;
-  is_draft?: boolean;
+  is_draft?: number;
   invoice_id?: number;
   partner_id?: number;
   status_id?: number;
   appointment_id?: number;
   date?: string;
   end_date?: string;
-  duration?: number;
+  duration?: string;
   body?: string;
   action_id?: number;
   share_with_partner?: boolean;
