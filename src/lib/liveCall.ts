@@ -38,15 +38,37 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
   audio.autoplay = true;
 
   let closed = false;
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const [micTrack] = stream.getAudioTracks();
-  pc.addTrack(micTrack, stream);
+  let stream: MediaStream | null = null;
+  let channel: RTCDataChannel | null = null;
+  let callLimit: ReturnType<typeof setTimeout> | undefined;
+  const finish = (notify: boolean) => {
+    if (closed) return;
+    closed = true;
+    if (callLimit !== undefined) clearTimeout(callLimit);
+    try { stream?.getTracks().forEach((track) => track.stop()); } catch { /* noop */ }
+    try { channel?.close(); } catch { /* noop */ }
+    try { pc.close(); } catch { /* noop */ }
+    audio.srcObject = null;
+    if (notify) callbacks.onClosed?.();
+  };
+
+  let micTrack: MediaStreamTrack;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const track = stream.getAudioTracks()[0];
+    if (!track) throw new Error("MICROPHONE_UNAVAILABLE");
+    micTrack = track;
+    pc.addTrack(micTrack, stream);
+  } catch (error) {
+    finish(false);
+    throw error;
+  }
 
   pc.ontrack = (e) => {
     audio.srcObject = e.streams[0];
   };
 
-  const channel = pc.createDataChannel("oai-events");
+  channel = pc.createDataChannel("oai-events");
   let assistantBuffer = "";
   let userBuffer = "";
 
@@ -89,36 +111,17 @@ export async function startLiveCall(agentId: string, callbacks: LiveCallCallback
     }
   };
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-
   let response: Awaited<ReturnType<typeof guestRealtimeOffer>>;
   try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
     response = await guestRealtimeOffer({ data: { agentId, sdp: offer.sdp ?? "" } });
+    if (!response.supported) throw new Error("REALTIME_UNAVAILABLE");
+    await pc.setRemoteDescription({ type: "answer", sdp: response.sdpAnswer });
   } catch (error) {
-    stream.getTracks().forEach((t) => t.stop());
-    pc.close();
+    finish(false);
     throw error;
   }
-  if (!response.supported) {
-    stream.getTracks().forEach((t) => t.stop());
-    pc.close();
-    throw new Error("REALTIME_UNAVAILABLE");
-  }
-  await pc.setRemoteDescription({ type: "answer", sdp: response.sdpAnswer });
-  let callLimit: ReturnType<typeof setTimeout> | undefined;
-  const finish = (notify: boolean) => {
-    if (closed) return;
-    closed = true;
-    if (callLimit !== undefined) clearTimeout(callLimit);
-    try {
-      stream.getTracks().forEach((track) => track.stop());
-      channel.close();
-      pc.close();
-    } catch { /* Already closed */ }
-    audio.srcObject = null;
-    if (notify) callbacks.onClosed?.();
-  };
   callLimit = window.setTimeout(() => finish(true), response.maxDurationSeconds * 1000);
 
   pc.onconnectionstatechange = () => {
