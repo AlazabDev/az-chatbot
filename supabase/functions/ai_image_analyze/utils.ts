@@ -4,7 +4,7 @@ export const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-export function createSuccessResponse(data: any, status = 200) {
+export function createSuccessResponse(data: unknown, status = 200) {
   return new Response(
     JSON.stringify({
       success: true,
