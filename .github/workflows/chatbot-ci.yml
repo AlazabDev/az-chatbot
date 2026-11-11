@@ -32,11 +32,7 @@ jobs:
           if-no-files-found: error
       - name: TypeScript
         run: bunx tsc --noEmit
-      - name: ESLint (changed application paths)
-        run: |
-          bunx eslint src/lib/public-chat.server.ts src/lib/guestSession.server.ts src/lib/guestHistory.functions.ts src/lib/foundry-live.functions.ts src/lib/chatApi.ts src/lib/chatAnalytics.functions.ts src/routes/admin.analytics.tsx 'src/routes/api/public/agents.$slug.ts' src/routes/api/health.ts src/test/guest-chat.test.ts src/test/guestSession.test.ts src/test/publicGatewaySecurity.test.ts --rule 'prettier/prettier: off'
-      - name: Legacy repository lint audit (non-blocking)
-        continue-on-error: true
+      - name: ESLint — entire repository
         run: bun run lint
       - name: Vitest
         run: bun run test
