@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
   const userId = claims?.claims?.sub;
   if (!userId) return json({ error: "Unauthorized" }, 401);
 
-  let body: any;
+  let body: { tenant_id?: string; batch_id?: string | null; files?: Array<{ name: string; data?: string; mime?: string }>; [key: string]: unknown };
   try {
     body = await req.json();
   } catch {
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         .eq("tenant_id", tenantId)
         .eq("phone_number_id", FINANCE_PHONE_ID)
         .maybeSingle()
-    : ({ data: null } as any);
+    : ({ data: null } as { data: { id: string } | null });
 
   const created: string[] = [];
   const skipped: string[] = [];
@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
       if (!obj.name || obj.id === null) continue;
       const path = folder ? `${folder}/${obj.name}` : obj.name;
       try {
-        const mime = String((obj.metadata as any)?.mimetype ?? "image/jpeg").toLowerCase();
+        const mime = String((obj.metadata as { mimetype?: string } | null)?.mimetype ?? "image/jpeg").toLowerCase();
         if (!mime.startsWith("image/")) {
           skipped.push(obj.name);
           continue;
