@@ -5,8 +5,8 @@ set -Eeuo pipefail
 umask 027
 ROOT=/mnt/ai/az-chatbot
 NAME=alazab-bot
-LIVE_PORT=3100
-TEST_PORT=3199
+LIVE_PORT=${LIVE_PORT:-3200}
+TEST_PORT=${TEST_PORT:-3299}
 BASE=$ROOT/.deploy
 RELEASES=$BASE/releases
 CURRENT=$BASE/current
@@ -63,6 +63,36 @@ for x in git node bun pm2 curl readlink; do need "$x"; done
 [[ -d "$ROOT/.git" || -f "$ROOT/.git" ]] || die "Missing checkout: $ROOT"
 mkdir -p "$RELEASES"
 log "PM2 account: $(id -un) / $HOME/.pm2"
+# Supabase Edge secrets do not automatically become PM2 environment variables.
+# Refuse an unconfigured production release before spending time on a build.
+check_runtime(){
+  local missing=() name value
+  if [[ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" && -z "${SUPABASE_SECRET_KEY:-}" && -z "${SUPABASE_SECRET_KEYS:-}" ]]; then
+    missing+=("SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY / SUPABASE_SECRET_KEYS")
+  fi
+  if [[ -z "${THREAD_SIGNING_SECRET:-}" && -z "${CHAT_GATEWAY_HASH_SECRET:-}" ]]; then
+    missing+=("THREAD_SIGNING_SECRET / CHAT_GATEWAY_HASH_SECRET")
+  fi
+  for name in FOUNDRY_INPUT_COST_PER_1M_TOKENS FOUNDRY_OUTPUT_COST_PER_1M_TOKENS CHAT_DAILY_BUDGET_USD; do
+    value="${!name:-}"
+    if ! [[ "$value" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk -v x="$value" 'BEGIN { exit !(x > 0) }'; then
+      missing+=("$name (positive USD number)")
+    fi
+  done
+  if ((${#missing[@]})); then
+    printf "Missing PM2 runtime inputs (names only):\n" >&2
+    printf " - %s\n" "${missing[@]}" >&2
+    printf "Edge Function secret digests cannot be used as plaintext values in Node.\n" >&2
+    return 1
+  fi
+}
+port_available(){
+  local port=$1
+  if command -v ss >/dev/null 2>&1 && ss -H -ltn "sport = :$port" | grep -q .; then
+    log "Port $port is occupied: existing service untouched"
+    return 1
+  fi
+}
 case "$MODE" in
   status)
     pm2 describe "$NAME" || true
@@ -73,7 +103,12 @@ case "$MODE" in
   rollback)
     fallback=$(link_target "$PREVIOUS")
     valid "$fallback" || die 'No previous release'
-    OLD=$(link_target "$CURRENT")
+    check_runtime || die 'Runtime inputs missing: no build attempted'
+port_available "$TEST_PORT" || die 'Probe port occupied'
+OLD=$(link_target "$CURRENT")
+if ! pm2 describe "$NAME" >/dev/null 2>&1; then
+  port_available "$LIVE_PORT" || die 'Live port used by an unmanaged process'
+fi
     SWITCHED=1
     pm2 delete "$NAME" >/dev/null 2>&1 || true
     point_to "$CURRENT" "$fallback"
@@ -84,8 +119,9 @@ case "$MODE" in
     pm2 save --force >/dev/null
     log 'Rollback healthy'
     exit 0 ;;
+  check) check_runtime && log "Runtime prerequisites present"; exit 0 ;;
   deploy) ;;
-  *) die 'Usage: bash deploy.sh [deploy|status|logs|rollback]' ;;
+  *) die 'Usage: bash deploy.sh [deploy|check|status|logs|rollback]' ;;
 esac
 OLD=$(link_target "$CURRENT")
 if pm2 describe "$NAME" >/dev/null 2>&1 && ! valid "$OLD"; then
@@ -99,6 +135,8 @@ WORKTREE=$BASE/worktree-$STAMP-$$
 NEW=$RELEASES/$STAMP-$SHORT
 git -C "$ROOT" worktree add --quiet --detach "$WORKTREE" "$COMMIT"
 log "Building $SHORT as Nitro node_server (local checkout untouched)"
+export APP_BASE_URL=https://bot.alazab.com
+export SUPABASE_URL=${SUPABASE_URL:-https://fjojyzvulhvqeitnaenv.supabase.co}
 (
   cd "$WORKTREE"
   bun install --frozen-lockfile
