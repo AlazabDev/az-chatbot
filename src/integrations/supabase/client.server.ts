@@ -32,16 +32,37 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+function resolveServerApiKey(): string | undefined {
+  // Modern Supabase secret keys are server-only and bypass RLS.
+  const direct = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (direct) return direct;
+  const configured = process.env.SUPABASE_SECRET_KEYS;
+  if (!configured) return undefined;
+  try {
+    const dictionary: unknown = JSON.parse(configured);
+    if (!dictionary || typeof dictionary !== "object" || Array.isArray(dictionary)) return undefined;
+    const entry = (dictionary as Record<string, unknown>).default;
+    if (typeof entry === "string" && entry) return entry;
+    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+      const key = (entry as Record<string, unknown>).api_key;
+      if (typeof key === "string" && key) return key;
+    }
+  } catch {
+    // Fail closed on malformed server-only configuration.
+  }
+  return undefined;
+}
+
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const SUPABASE_URL = process.env.SUPABASE_URL || "https://fjojyzvulhvqeitnaenv.supabase.co";
+  const SUPABASE_SERVICE_ROLE_KEY = resolveServerApiKey();
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
+      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY / SUPABASE_SECRET_KEYS"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Configure the PM2 Node runtime; Supabase Edge Function secrets are a separate environment.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
