@@ -1,6 +1,6 @@
 # AZ-Chatbot — production deployment on azab-orchestrator
 
-Project: `/mnt/ai/az-chatbot`. Domain: `https://bot.alazab.com`.
+Project: `/mnt/ai/az-chatbot`. Domain: `https://chatbot.alazab.com`.
 Process manager: PM2, under the account executing `deploy.sh`. HTTP upstream: `127.0.0.1:3200`.
 Probe port: `127.0.0.1:3299`. Existing Docker service at port 3100 is never stopped.
 
@@ -46,10 +46,10 @@ To preserve locally edited `deploy.sh` before `git pull`, use:
 
 ## Reverse proxy
 
-The repository contains `deploy/nginx.bot.alazab.com.conf`: an HTTP bootstrap template.
-Before installing, inspect existing `server_name bot.alazab.com` in `nginx -T`.
+The repository contains `deploy/nginx.chatbot.alazab.com.conf`: an HTTP bootstrap template.
+Before installing, inspect existing `server_name chatbot.alazab.com` in `nginx -T`.
 Do not overwrite an existing site. Validate with `nginx -t`, enable HTTPS with
-Certbot after DNS points to the host, and test `https://bot.alazab.com/api/health`.
+Certbot after DNS points to the host, and test `https://chatbot.alazab.com/api/health`.
 
 ## Recovery
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# AZ-Chatbot PM2 deployment, source /mnt/ai/az-chatbot, domain bot.alazab.com.
+# AZ-Chatbot PM2 deployment, source /mnt/ai/az-chatbot, domain ${APP_DOMAIN:-chatbot.alazab.com}.
 # Reverse proxy / HTTPS are managed separately. No secret files are generated.
 set -Eeuo pipefail
 umask 027
-ROOT=/mnt/ai/az-chatbot
+ROOT=${ROOT:-/mnt/ai/az-chatbot}
+APP_DOMAIN=${APP_DOMAIN:-chatbot.alazab.com}
 NAME=alazab-bot
 LIVE_PORT=${LIVE_PORT:-3200}
 TEST_PORT=${TEST_PORT:-3299}
@@ -59,7 +60,7 @@ cleanup(){
   exit "$rc"
 }
 trap cleanup EXIT
-for x in git node bun pm2 curl readlink; do need "$x"; done
+for x in git node bun pm2 curl readlink awk; do need "$x"; done
 [[ -d "$ROOT/.git" || -f "$ROOT/.git" ]] || die "Missing checkout: $ROOT"
 mkdir -p "$RELEASES"
 log "PM2 account: $(id -un) / $HOME/.pm2"
@@ -142,7 +143,7 @@ WORKTREE=$BASE/worktree-$STAMP-$$
 NEW=$RELEASES/$STAMP-$SHORT
 git -C "$ROOT" worktree add --quiet --detach "$WORKTREE" "$COMMIT"
 log "Building $SHORT as Nitro node_server (local checkout untouched)"
-export APP_BASE_URL=https://bot.alazab.com
+export APP_BASE_URL=${APP_BASE_URL:-https://$APP_DOMAIN}
 export SUPABASE_URL=${SUPABASE_URL:-https://fjojyzvulhvqeitnaenv.supabase.co}
 (
   cd "$WORKTREE"
@@ -180,5 +181,5 @@ if ! health "$LIVE_PORT"; then
 fi
 SWITCHED=0
 pm2 save --force >/dev/null
-log "SUCCESS $SHORT; bot.alazab.com -> 127.0.0.1:$LIVE_PORT (Nginx separate)"
+log "SUCCESS $SHORT; $APP_DOMAIN -> 127.0.0.1:$LIVE_PORT (Nginx separate)"
 # END AZ-CHATBOT PM2 DEPLOY
