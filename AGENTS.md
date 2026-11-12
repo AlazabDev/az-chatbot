@@ -37,3 +37,4 @@ use the editor.
 - Embedded agent menus report their layout to the host iframe, which verifies both message origin and source before resizing.
 - Legacy Azure settings never persist private API keys in browser storage; production credentials belong in server secrets.
 - Content routes use per-page metadata, sharing the pageHead helper when no custom metadata exists.
+- Keep the OpenAI v4 SDK installed for type resolution of the preserved legacy Supabase edge-runtime declarations; it is not the application's chat provider.
