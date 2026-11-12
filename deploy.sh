@@ -108,12 +108,8 @@ case "$MODE" in
   rollback)
     fallback=$(link_target "$PREVIOUS")
     valid "$fallback" || die 'No previous release'
-    check_runtime || die 'Runtime inputs missing: no build attempted'
-port_available "$TEST_PORT" || die 'Probe port occupied'
-OLD=$(link_target "$CURRENT")
-if ! pm2 describe "$NAME" >/dev/null 2>&1; then
-  port_available "$LIVE_PORT" || die 'Live port used by an unmanaged process'
-fi
+    check_runtime || die 'Runtime inputs missing; rollback not attempted'
+    OLD=$(link_target "$CURRENT")
     SWITCHED=1
     pm2 delete "$NAME" >/dev/null 2>&1 || true
     point_to "$CURRENT" "$fallback"
@@ -128,7 +124,13 @@ fi
   deploy) ;;
   *) die 'Usage: bash deploy.sh [deploy|check|status|logs|rollback]' ;;
 esac
+# Deployment must run the same checks as rollback before fetching/building code.
+check_runtime || die 'Missing runtime inputs: deployment not attempted'
+port_available "$TEST_PORT" || die 'Probe port occupied'
 OLD=$(link_target "$CURRENT")
+if ! pm2 describe "$NAME" >/dev/null 2>&1; then
+  port_available "$LIVE_PORT" || die 'Live port occupied by another process'
+fi
 if pm2 describe "$NAME" >/dev/null 2>&1 && ! valid "$OLD"; then
   die "Refusing to overwrite unmanaged PM2 process $NAME"
 fi
