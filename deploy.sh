@@ -70,8 +70,13 @@ check_runtime(){
   if [[ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" && -z "${SUPABASE_SECRET_KEY:-}" && -z "${SUPABASE_SECRET_KEYS:-}" ]]; then
     missing+=("SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY / SUPABASE_SECRET_KEYS")
   fi
-  if [[ -z "${THREAD_SIGNING_SECRET:-}" && -z "${CHAT_GATEWAY_HASH_SECRET:-}" ]]; then
-    missing+=("THREAD_SIGNING_SECRET / CHAT_GATEWAY_HASH_SECRET")
+  local signing="${CHAT_GATEWAY_HASH_SECRET:-${THREAD_SIGNING_SECRET:-}}"
+  if ((${#signing}<32)) || [[ "$signing" == *"REPLACE"* || "$signing" == *"replace"* || "$signing" == *"example"* ]]; then
+    missing+=("CHAT_GATEWAY_HASH_SECRET / THREAD_SIGNING_SECRET (real >=32 characters)")
+  fi
+  if [[ -z "${FOUNDRY_PROJECT_ENDPOINT:-}" ]]; then missing+=("FOUNDRY_PROJECT_ENDPOINT"); fi
+  if [[ -z "${FOUNDRY_ACCESS_TOKEN:-}" && ( -z "${FOUNDRY_TENANT_ID:-}" || -z "${FOUNDRY_CLIENT_ID:-}" || -z "${FOUNDRY_CLIENT_SECRET:-}" ) ]]; then
+    missing+=("FOUNDRY_TENANT_ID + FOUNDRY_CLIENT_ID + FOUNDRY_CLIENT_SECRET (or FOUNDRY_ACCESS_TOKEN)")
   fi
   for name in FOUNDRY_INPUT_COST_PER_1M_TOKENS FOUNDRY_OUTPUT_COST_PER_1M_TOKENS CHAT_DAILY_BUDGET_USD; do
     value="${!name:-}"
